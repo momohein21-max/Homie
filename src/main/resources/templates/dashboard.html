@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homie - Dashboard</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Spectral:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #EFE9DD; --card: #FAF6EE; --card-edge: #E7DECB; --ink: #2E2B26;
+            --muted: #857C6A; --muted2: #9A917D; --green: #4A7C59; --green-hover: #3F6B4D;
+            --green-deep: #3C5A40; --green-soft: #6B8E5A; --green-pale: #E6EDDC;
+            --terra: #9A4F38; --ochre: #8A6320; --ochre-bg: #F3E7CC; --terra-bg: #EFDBD2;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: 'Hanken Grotesk', sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #D8CDB6; border-radius: 8px; border: 2px solid #EFE9DD; }
+        a { text-decoration: none; }
+
+
+        .menu-toggle { display: none; }
+        .sidebar-backdrop { display: none; }
+        .app { display: flex; min-height: 100vh; }
+
+        .sidebar { flex: none; width: 252px; background: var(--green-deep); color: #CCDAC0; display: flex;
+                   flex-direction: column; position: sticky; top: 0; height: 100vh; padding: 24px 18px; }
+        .sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 22px; }
+        .sidebar-brand .mark { width: 34px; height: 34px; border-radius: 10px; background: #EAF0E2; color: var(--green-deep);
+                                display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+        .sidebar-brand .name { font-family: 'Spectral', serif; font-weight: 600; font-size: 21px; letter-spacing: .04em; color: #F1F5EB; }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 13px; width: 100%; padding: 11px 14px; border: none;
+                    border-radius: 12px; font-size: 14.5px; cursor: pointer; text-align: left; background: transparent;
+                    color: #C2D2B6; font-weight: 500; }
+        .nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .nav-item.active { background: #F4EEE0; color: var(--green-deep); font-weight: 600; }
+        .sidebar-footer { border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; display: flex; align-items: center; gap: 11px; }
+        .sidebar-footer-link { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; color: inherit; }
+        .sidebar-footer .who-name { font-size: 14px; font-weight: 600; color: #F1F5EB; }
+        .sidebar-footer .who-room { font-size: 12px; color: #A9BB9D; }
+        .logout-btn { background: rgba(255,255,255,.08); border: none; border-radius: 9px; width: 32px; height: 32px;
+                      display: flex; align-items: center; justify-content: center; cursor: pointer; color: #CCDAC0; flex-shrink: 0; }
+        .logout-btn:hover { background: rgba(255,255,255,.16); }
+
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .topbar { position: sticky; top: 0; z-index: 5; background: rgba(239,233,221,.86); backdrop-filter: blur(8px);
+                  border-bottom: 1px solid #E2D9C8; padding: 18px 36px; display: flex; align-items: center;
+                  justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .topbar h1 { font-family: 'Spectral', serif; font-weight: 600; font-size: 24px; margin: 0; line-height: 1.1; }
+        .topbar .subtitle { margin: 3px 0 0; font-size: 13.5px; color: var(--muted); }
+        .date-pill { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--card-edge);
+                     border-radius: 11px; padding: 8px 13px; font-size: 13.5px; font-weight: 500; color: #6B6149; }
+
+        .content { padding: 34px 36px 56px; max-width: 1120px; width: 100%; margin: 0 auto; }
+
+        .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;
+                  color: #FBF8F1; flex-shrink: 0; }
+        .avatar-32 { width: 32px; height: 32px; font-size: 12px; }
+        .avatar-36 { width: 36px; height: 36px; font-size: 13px; }
+        .avatar-40 { width: 40px; height: 40px; font-size: 14px; }
+
+        .card { background: var(--card); border: 1px solid var(--card-edge); border-radius: 18px; box-shadow: 0 1px 2px rgba(60,50,30,.04); }
+        .stat-label { font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted2); }
+
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .badge-current { background: var(--green-pale); color: var(--green-deep); }
+        .badge-upcoming{ background: var(--bg); color: #8A8170; }
+
+        .greeting h2 { font-family: 'Spectral', serif; font-weight: 600; font-size: 30px; margin: 0 0 6px; }
+        .greeting p { margin: 0; font-size: 16px; color: var(--muted); }
+
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin: 26px 0 24px; }
+        .stat-card { border-radius: 18px; padding: 20px; cursor: pointer; }
+        .stat-card.hero { background: var(--green-deep); color: #EAF0E2; position: relative; overflow: hidden;
+                           box-shadow: 0 10px 26px rgba(60,90,64,.22); }
+        .stat-card.plain { background: var(--card); border: 1px solid var(--card-edge); box-shadow: 0 1px 2px rgba(60,50,30,.04); }
+        .stat-card .stat-label.on-hero { color: #AFC4A4; }
+        .stat-card .stat-value { font-family: 'Spectral', serif; font-size: 22px; margin: 16px 0 12px; display: flex;
+                                  align-items: center; gap: 11px; }
+        .stat-card .stat-value.money { font-size: 26px; margin: 14px 0 8px; color: var(--ink); }
+        .stat-card .stat-value.plain-title { font-size: 22px; margin: 14px 0 8px; color: var(--ink); }
+        .stat-card .stat-note { font-size: 13.5px; color: #CBD8C0; }
+        .stat-card.plain .stat-note { color: var(--muted); }
+        .stat-card .stat-note.warn { color: var(--terra); font-weight: 600; }
+
+        .row2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+        .panel { padding: 22px 24px; }
+        .panel-head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; }
+        .panel-head h3 { font-family: 'Spectral', serif; font-weight: 600; font-size: 18px; margin: 0; }
+        .panel-head a { font-size: 13px; font-weight: 600; color: var(--green-soft); }
+        .panel-head a:hover { color: var(--green-deep); }
+
+        .ann-row { display: flex; gap: 14px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid #ECE3D2; }
+        .ann-row:last-child { border-bottom: none; }
+        .ann-row .title { font-weight: 600; font-size: 14.5px; color: var(--ink); margin: 0 0 3px; }
+        .ann-row .meta { font-size: 12.5px; color: var(--muted2); }
+        .empty-note { color: var(--muted); font-size: 14px; padding: 10px 0; }
+
+        .rota-row { display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 11px; margin: 2px 0; }
+        .rota-row.current { background: #EEF2E6; border: 1px solid #D5E0C7; }
+        .rota-row .rname { font-weight: 600; font-size: 14px; color: var(--ink); flex: 1; }
+
+        @media (max-width: 1000px) {
+            .stat-grid { grid-template-columns: repeat(2, 1fr); }
+            .row2 { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 700px) {
+            .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 60; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 8px 0 24px rgba(0,0,0,.18); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: flex; align-items: center; justify-content: center; position: fixed; top: 14px; left: 14px; z-index: 70; width: 40px; height: 40px; border-radius: 10px; background: var(--green-deep); color: #EAF0E2; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+            .sidebar-backdrop.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 55; }
+            .stat-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<button class="menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <a th:href="@{/}" class="sidebar-brand" style="text-decoration:none;cursor:pointer;">
+            <div class="mark">H</div>
+            <span class="name">HOMIE</span>
+        </a>
+        <nav class="sidebar-nav">
+            <a th:href="@{/}" class="nav-item active">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10M9.5 19.5v-5h5v5"></path></svg>
+                <span>Dashboard</span>
+            </a>
+            <a th:href="@{/cleaning}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4c.4 2.7 1.9 4.2 4.6 4.6-2.7.4-4.2 1.9-4.6 4.6-.4-2.7-1.9-4.2-4.6-4.6 2.7-.4 4.2-1.9 4.6-4.6ZM18.5 13.5c.2 1.2.9 1.9 2.1 2.1-1.2.2-1.9.9-2.1 2.1-.2-1.2-.9-1.9-2.1-2.1 1.2-.2 1.9-.9 2.1-2.1Z"></path></svg>
+                <span>Cleaning rota</span>
+            </a>
+            <a th:href="@{/schedule}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"></path></svg>
+                <span>Washing &amp; bins</span>
+            </a>
+            <a th:href="@{/bills}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21ZM9 8.5h6M9 12.5h6"></path></svg>
+                <span>Bills</span>
+            </a>
+            <a th:href="@{/members}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 20v-1.5a3.5 3.5 0 0 0-3.5-3.5H8a3.5 3.5 0 0 0-3.5 3.5V20M10.5 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M19.5 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"></path></svg>
+                <span>Housemates</span>
+            </a>
+            <a th:href="@{/announcements}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
+                <span>Announcements</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
+                <div class="avatar avatar-38" th:if="${currentUser}"
+                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
+                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                <div style="flex:1;min-width:0;">
+                    <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                </div>
+            </a>
+            <form th:action="@{/logout}" method="post" class="m-0">
+                <button type="submit" class="logout-btn" title="Sign out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1>Dashboard</h1>
+                <p class="subtitle">A quick look at the house today</p>
+            </div>
+            <div class="date-pill">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9A917D" stroke-width="1.8"><rect x="3" y="4.5" width="18" height="17" rx="3"></rect><path d="M3 9h18M8 2.5v4M16 2.5v4" stroke-linecap="round"></path></svg>
+                <span th:text="${today}">Wednesday</span>
+            </div>
+        </header>
+
+        <div class="content">
+
+            <div class="greeting">
+                <h2><span th:text="${greeting}">Good morning</span><span th:if="${currentUser}" th:text="', ' + ${currentUser.name}">, Momo</span>.</h2>
+                <p>Here's how the house is looking today.</p>
+            </div>
+
+            <div class="stat-grid">
+                <!-- Cleaning -->
+                <a th:href="@{/cleaning}" class="stat-card hero">
+                    <div class="stat-label on-hero">This week's clean</div>
+                    <div class="stat-value">
+                        <div class="avatar avatar-40" th:style="${@avatarService.pictureUrl(cleanerThisWeek) != null ? ('background-image:url(' + @avatarService.pictureUrl(cleanerThisWeek) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(cleanerThisWeek))}"
+                             th:text="${@avatarService.pictureUrl(cleanerThisWeek) != null ? '' : @avatarService.initials(cleanerThisWeek)}">Mo</div>
+                        <span th:text="${cleanerThisWeek}">Momo</span>
+                    </div>
+                    <div class="stat-note"
+                         th:text="${currentUser != null and cleanerThisWeek == currentUser.name ? 'That is you — thanks for keeping us tidy!' : 'Keeping the house tidy this week.'}">
+                        That's you — thanks for keeping us tidy!
+                    </div>
+                </a>
+                <!-- Bins today -->
+                <a th:href="@{/schedule}" class="stat-card plain">
+                    <div class="stat-label">Washing &amp; bins today</div>
+                    <div class="stat-value plain-title" th:text="${roomToday} ?: 'Weekend'">Room 3</div>
+                    <div class="stat-note"
+                         th:text="${roomToday != null ? (membersToday + ' are on today') : 'No bins today — enjoy it'}">
+                        Ágatha &amp; Julia are on today
+                    </div>
+                </a>
+                <!-- Bills -->
+                <a th:href="@{/bills}" class="stat-card plain">
+                    <div class="stat-label">Outstanding bills</div>
+                    <div class="stat-value money" th:text="${'€' + #numbers.formatDecimal(outstandingTotal, 1, 2)}">€0.00</div>
+                    <div class="stat-note warn" th:text="${unpaidBillCount} + ' unpaid'">0 unpaid</div>
+                </a>
+                <!-- Next clean -->
+                <a th:href="@{/cleaning}" class="stat-card plain">
+                    <div class="stat-label">Up next to clean</div>
+                    <div class="stat-value plain-title">
+                        <div class="avatar avatar-36" th:style="${@avatarService.pictureUrl(nextCleaner) != null ? ('background-image:url(' + @avatarService.pictureUrl(nextCleaner) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(nextCleaner))}"
+                             th:text="${@avatarService.pictureUrl(nextCleaner) != null ? '' : @avatarService.initials(nextCleaner)}">Ed</div>
+                        <span th:text="${nextCleaner}">Edgar</span>
+                    </div>
+                    <div class="stat-note">Coming up next</div>
+                </a>
+            </div>
+
+            <div class="row2">
+                <!-- Announcements -->
+                <div class="card panel">
+                    <div class="panel-head">
+                        <h3>Recent announcements</h3>
+                        <a th:href="@{/announcements}">View all</a>
+                    </div>
+                    <div th:if="${#lists.isEmpty(announcements)}" class="empty-note">No announcements yet.</div>
+                    <a th:each="a : ${announcements}" th:href="@{'/announcements/' + ${a.id}}" class="ann-row" style="color:inherit;">
+                        <div class="avatar avatar-36" th:if="${a.createdBy != null}"
+                             th:style="${@avatarService.pictureUrl(a.createdBy.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(a.createdBy.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(a.createdBy.name))}"
+                             th:text="${@avatarService.pictureUrl(a.createdBy.name) != null ? '' : @avatarService.initials(a.createdBy.name)}">Ju</div>
+                        <div style="flex:1;min-width:0;">
+                            <div class="title" th:text="${a.title}">House meeting Sunday</div>
+                            <div class="meta" th:text="${(a.createdBy != null ? a.createdBy.name : 'A former housemate') + ' · ' + a.dateLabel}">Julia · Jun 22</div>
+                        </div>
+                    </a>
+                </div>
+
+                <!-- Cleaning rota mini -->
+                <div class="card panel">
+                    <div class="panel-head">
+                        <h3>Cleaning rota</h3>
+                        <a th:href="@{/cleaning}">View all</a>
+                    </div>
+                    <div th:each="r : ${rotaMini}" th:class="${r.current} ? 'rota-row current' : 'rota-row'">
+                        <div class="avatar avatar-32" th:style="${@avatarService.pictureUrl(r.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.name))}"
+                             th:text="${@avatarService.pictureUrl(r.name) != null ? '' : @avatarService.initials(r.name)}">Mo</div>
+                        <div class="rname" th:text="${r.name}">Momo</div>
+                        <span th:class="${r.current} ? 'badge badge-current' : 'badge badge-upcoming'"
+                              th:text="${r.current} ? 'This week' : 'Upcoming'">This week</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.querySelector('.sidebar-backdrop').classList.toggle('show');
+}
+</script>
+</body>
+</html>

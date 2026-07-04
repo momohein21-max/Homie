@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homie - Login</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Spectral:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet">
+
+    <style>
+        :root {
+            --bg:          #EFE9DD;
+            --card:        #FAF6EE;
+            --card-edge:   #E7DECB;
+            --ink:         #2E2B26;
+            --muted:       #857C6A;
+            --muted2:      #9A917D;
+            --green:       #4A7C59;
+            --green-hover: #3F6B4D;
+            --green-deep:  #3C5A40;
+            --green-soft:  #6B8E5A;
+            --green-pale:  #E6EDDC;
+            --terra:       #9A4F38;
+            --input-bg:    #FFFDF8;
+            --input-edge:  #E0D6C2;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: 'Hanken Grotesk', sans-serif; background: var(--bg); color: var(--ink);
+               min-height: 100vh; -webkit-font-smoothing: antialiased; }
+        input:focus { outline: none; border-color: var(--green-soft) !important;
+                      box-shadow: 0 0 0 3px rgba(107,142,90,.16); }
+        ::placeholder { color: #B3A993; }
+
+        .shell { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 28px; }
+        .card { display: flex; width: min(980px, 100%); min-height: 600px; background: var(--card);
+                border-radius: 26px; overflow: hidden; box-shadow: 0 30px 80px rgba(54,44,26,.16);
+                border: 1px solid var(--card-edge); }
+
+        .brand-panel { flex: 1.05; position: relative;
+                        background: radial-gradient(120% 120% at 0% 0%, #4A6E4C 0%, #3C5A40 55%, #34503A 100%);
+                        color: #EAF0E2; padding: 52px 48px; display: flex; flex-direction: column;
+                        justify-content: space-between; overflow: hidden; }
+        .brand-panel .bubble-1 { position: absolute; width: 340px; height: 340px; border-radius: 50%;
+                                  background: rgba(255,253,246,.05); top: -120px; right: -90px; }
+        .brand-panel .bubble-2 { position: absolute; width: 200px; height: 200px; border-radius: 50%;
+                                  background: rgba(255,253,246,.05); bottom: -70px; left: -50px; }
+        .brand-row { position: relative; display: flex; align-items: center; gap: 11px; }
+        .brand-mark { width: 34px; height: 34px; border-radius: 10px; background: #EAF0E2; color: #3C5A40;
+                      display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+        .brand-name { font-family: 'Spectral', serif; font-weight: 600; font-size: 23px; letter-spacing: .04em; }
+        .brand-headline { position: relative; }
+        .brand-headline h1 { font-family: 'Spectral', serif; font-weight: 600; font-size: 38px; line-height: 1.12;
+                              margin: 0 0 16px; }
+        .brand-headline p { margin: 0; font-size: 15.5px; line-height: 1.6; color: #CBD8C0; max-width: 330px; }
+        .brand-stats { position: relative; display: flex; gap: 26px; font-size: 13px; color: #BBCBAF; }
+        .brand-stats .num { font-family: 'Spectral', serif; font-size: 26px; color: #EAF0E2; }
+
+        .form-panel { flex: 1; padding: 52px 48px; display: flex; flex-direction: column; justify-content: center; }
+        .form-panel h2 { font-family: 'Spectral', serif; font-weight: 600; font-size: 28px; margin: 0 0 6px; }
+        .form-panel .lead { margin: 0 0 30px; color: var(--muted); font-size: 15px; }
+        label.field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em;
+                             text-transform: uppercase; color: var(--muted2); margin: 0 0 7px; }
+        .field { width: 100%; padding: 13px 15px; border: 1px solid var(--input-edge); border-radius: 12px;
+                 background: var(--input-bg); font-size: 15px; color: var(--ink); margin: 0 0 18px;
+                 font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-primary { width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--green);
+                       color: #F5F1E8; font-size: 15.5px; font-weight: 600; cursor: pointer;
+                       box-shadow: 0 6px 16px rgba(74,124,89,.28); font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-primary:hover { background: var(--green-hover); }
+        .switch-line { text-align: center; margin: 24px 0 0; font-size: 14.5px; color: var(--muted); }
+        .switch-line a { color: var(--green-soft); font-weight: 700; text-decoration: none; }
+        .switch-line a:hover { color: var(--green-deep); }
+
+        .alert { border-radius: 12px; padding: 12px 15px; font-size: 14px; margin: 0 0 18px; }
+        .alert-success { background: var(--green-pale); color: var(--green-deep); }
+        .alert-danger  { background: #EFDBD2; color: var(--terra); }
+        .alert-info    { background: #F3E7CC; color: #8A6320; }
+
+        @media (max-width: 760px) {
+            .brand-panel { display: none; }
+            .card { min-height: 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="shell">
+    <div class="card">
+
+        <!-- Brand panel -->
+        <div class="brand-panel">
+            <div class="bubble-1"></div>
+            <div class="bubble-2"></div>
+            <div class="brand-row">
+                <div class="brand-mark">H</div>
+                <span class="brand-name">HOMIE</span>
+            </div>
+            <div class="brand-headline">
+                <h1>A calmer way<br>to share a home.</h1>
+                <p>Cleaning weeks, bins, bills and house notices — all in one warm little place for everyone under this roof.</p>
+            </div>
+            <div class="brand-stats">
+                <div><div class="num">9</div>housemates</div>
+                <div><div class="num">5</div>rooms</div>
+                <div><div class="num">1</div>home</div>
+            </div>
+        </div>
+
+        <!-- Form panel -->
+        <div class="form-panel">
+            <h2>Welcome back</h2>
+            <p class="lead">Sign in to see what's happening at home.</p>
+
+            <div th:if="${param.registered}" class="alert alert-success">Account created. Please log in.</div>
+            <div th:if="${param.error}" class="alert alert-danger">Wrong email or password.</div>
+            <div th:if="${param.logout}" class="alert alert-info">You have been logged out.</div>
+            <div th:if="${param.emailChanged}" class="alert alert-info">Your email was updated. Please log in with your new email.</div>
+            <div th:if="${param.deleted}" class="alert alert-info">Your account has been deleted.</div>
+            <div th:if="${param.resetSuccess}" class="alert alert-success">Your password has been changed. Please log in.</div>
+
+            <form th:action="@{/login}" method="post">
+                <label class="field-label" for="username">Email</label>
+                <input type="email" id="username" name="username" class="field" required>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin: 0 0 7px;">
+                    <label class="field-label" for="password" style="margin:0;">Password</label>
+                    <a th:href="@{/forgot-password}" style="font-size:12.5px; color:var(--green-soft); font-weight:600;">Forgot password?</a>
+                </div>
+                <input type="password" id="password" name="password" class="field" required>
+
+                <button type="submit" class="btn-primary">Sign in</button>
+            </form>
+
+            <p class="switch-line">New to the house? <a th:href="@{/register}">Create an account</a></p>
+        </div>
+
+    </div>
+</div>
+</body>
+</html>

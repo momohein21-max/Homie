@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homie - My profile</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Spectral:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #EFE9DD; --card: #FAF6EE; --card-edge: #E7DECB; --ink: #2E2B26;
+            --muted: #857C6A; --muted2: #9A917D; --green: #4A7C59; --green-hover: #3F6B4D;
+            --green-deep: #3C5A40; --green-soft: #6B8E5A; --green-pale: #E6EDDC;
+            --terra: #9A4F38; --terra-bg: #EFDBD2; --input-bg: #FFFDF8; --input-edge: #E0D6C2;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: 'Hanken Grotesk', sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #D8CDB6; border-radius: 8px; border: 2px solid #EFE9DD; }
+        a { text-decoration: none; }
+
+        .menu-toggle { display: none; }
+        .sidebar-backdrop { display: none; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--green-soft) !important; box-shadow: 0 0 0 3px rgba(107,142,90,.16); }
+
+        .app { display: flex; min-height: 100vh; }
+
+        .sidebar { flex: none; width: 252px; background: var(--green-deep); color: #CCDAC0; display: flex;
+                   flex-direction: column; position: sticky; top: 0; height: 100vh; padding: 24px 18px; }
+        .sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 22px; }
+        .sidebar-brand .mark { width: 34px; height: 34px; border-radius: 10px; background: #EAF0E2; color: var(--green-deep);
+                                display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+        .sidebar-brand .name { font-family: 'Spectral', serif; font-weight: 600; font-size: 21px; letter-spacing: .04em; color: #F1F5EB; }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 13px; width: 100%; padding: 11px 14px; border: none;
+                    border-radius: 12px; font-size: 14.5px; cursor: pointer; text-align: left; background: transparent;
+                    color: #C2D2B6; font-weight: 500; }
+        .nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .nav-item.active { background: #F4EEE0; color: var(--green-deep); font-weight: 600; }
+        .sidebar-footer { border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; display: flex; align-items: center; gap: 11px; }
+        .sidebar-footer .who-name { font-size: 14px; font-weight: 600; color: #F1F5EB; }
+        .sidebar-footer .who-room { font-size: 12px; color: #A9BB9D; }
+        .logout-btn { background: rgba(255,255,255,.08); border: none; border-radius: 9px; width: 32px; height: 32px;
+                      display: flex; align-items: center; justify-content: center; cursor: pointer; color: #CCDAC0; flex-shrink: 0; }
+        .logout-btn:hover { background: rgba(255,255,255,.16); }
+        .sidebar-footer.active { background: #F4EEE0; border-radius: 12px; padding: 12px 10px; margin: 6px -6px 0; border-top: none; }
+        .sidebar-footer.active .who-name { color: var(--green-deep); }
+        .sidebar-footer.active .who-room { color: #6B6149; }
+        .sidebar-footer.active .logout-btn { background: rgba(60,90,64,.08); color: var(--green-deep); }
+        .sidebar-footer.active .logout-btn:hover { background: rgba(60,90,64,.16); }
+
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .topbar { position: sticky; top: 0; z-index: 5; background: rgba(239,233,221,.86); backdrop-filter: blur(8px);
+                  border-bottom: 1px solid #E2D9C8; padding: 18px 36px; }
+        .topbar h1 { font-family: 'Spectral', serif; font-weight: 600; font-size: 24px; margin: 0; line-height: 1.1; }
+        .topbar .subtitle { margin: 3px 0 0; font-size: 13.5px; color: var(--muted); }
+
+        .content { padding: 34px 36px 56px; max-width: 640px; width: 100%; margin: 0 auto; }
+
+        .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;
+                  color: #FBF8F1; flex-shrink: 0; }
+        .avatar-38 { width: 38px; height: 38px; font-size: 14px; }
+        .avatar-current { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; border: 2px solid var(--card-edge); }
+        .avatar-placeholder { width: 84px; height: 84px; border-radius: 50%; font-size: 26px; }
+
+        .card { background: var(--card); border: 1px solid var(--card-edge); border-radius: 18px; padding: 26px 28px;
+                margin-bottom: 18px; box-shadow: 0 1px 2px rgba(60,50,30,.04); }
+        .card h2 { font-family: 'Spectral', serif; font-weight: 600; font-size: 18px; margin: 0 0 18px; }
+
+        .field-label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+                        color: var(--muted2); margin: 0 0 7px; }
+        .field { width: 100%; padding: 11px 13px; border: 1px solid var(--input-edge); border-radius: 10px;
+                 background: var(--input-bg); font-size: 14.5px; color: var(--ink); font-family: 'Hanken Grotesk', sans-serif; }
+        .mb18 { margin-bottom: 18px; }
+        .field-hint { color: var(--muted); font-size: 12.5px; margin-top: 5px; }
+        .field-error { color: var(--terra); font-size: 12.5px; margin-top: 5px; }
+
+        .btn-primary { background: var(--green); border: none; color: #F5F1E8; border-radius: 10px; font-weight: 600;
+                       padding: 11px 20px; font-size: 14.5px; cursor: pointer; font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-primary:hover { background: var(--green-hover); }
+
+        .alert-success { background: var(--green-pale); color: var(--green-deep); border-radius: 12px; padding: 12px 15px; font-size: 14px; margin: 0 0 18px; }
+        .alert-danger  { background: var(--terra-bg); color: var(--terra); border-radius: 12px; padding: 12px 15px; font-size: 14px; margin: 0 0 18px; }
+
+        .danger-card { background: #FBF3F0; border: 1px solid var(--terra-bg); border-radius: 18px; padding: 24px 26px; }
+        .danger-card h2 { color: var(--terra); }
+        .danger-card p { color: #6B6149; font-size: 14px; margin: 0 0 16px; }
+        .btn-danger { background: var(--terra); border: none; color: #fff; border-radius: 10px; font-weight: 600;
+                      padding: 10px 18px; font-size: 14px; cursor: pointer; font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-danger:hover { background: #7C3F2C; }
+
+        @media (max-width: 700px) { .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 60; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 8px 0 24px rgba(0,0,0,.18); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: flex; align-items: center; justify-content: center; position: fixed; top: 14px; left: 14px; z-index: 70; width: 40px; height: 40px; border-radius: 10px; background: var(--green-deep); color: #EAF0E2; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+            .sidebar-backdrop.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 55; } }
+    </style>
+</head>
+<body>
+<button class="menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <a th:href="@{/}" class="sidebar-brand" style="text-decoration:none;cursor:pointer;">
+            <div class="mark">H</div>
+            <span class="name">HOMIE</span>
+        </a>
+        <nav class="sidebar-nav">
+            <a th:href="@{/}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10M9.5 19.5v-5h5v5"></path></svg>
+                <span>Dashboard</span>
+            </a>
+            <a th:href="@{/cleaning}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4c.4 2.7 1.9 4.2 4.6 4.6-2.7.4-4.2 1.9-4.6 4.6-.4-2.7-1.9-4.2-4.6-4.6 2.7-.4 4.2-1.9 4.6-4.6ZM18.5 13.5c.2 1.2.9 1.9 2.1 2.1-1.2.2-1.9.9-2.1 2.1-.2-1.2-.9-1.9-2.1-2.1 1.2-.2 1.9-.9 2.1-2.1Z"></path></svg>
+                <span>Cleaning rota</span>
+            </a>
+            <a th:href="@{/schedule}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"></path></svg>
+                <span>Washing &amp; bins</span>
+            </a>
+            <a th:href="@{/bills}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21ZM9 8.5h6M9 12.5h6"></path></svg>
+                <span>Bills</span>
+            </a>
+            <a th:href="@{/members}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 20v-1.5a3.5 3.5 0 0 0-3.5-3.5H8a3.5 3.5 0 0 0-3.5 3.5V20M10.5 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M19.5 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"></path></svg>
+                <span>Housemates</span>
+            </a>
+            <a th:href="@{/announcements}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
+                <span>Announcements</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer active">
+            <div class="avatar avatar-38" th:style="${@avatarService.pictureUrl(profile.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(profile.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(profile.name))}"
+                 th:text="${@avatarService.pictureUrl(profile.name) != null ? '' : @avatarService.initials(profile.name)}">Mo</div>
+            <div style="flex:1;min-width:0;">
+                <div class="who-name" th:text="${profile.name}">Momo</div>
+                <div class="who-room" th:text="${profile.room} ?: 'No room set'">Room 4</div>
+            </div>
+            <form th:action="@{/logout}" method="post" class="m-0">
+                <button type="submit" class="logout-btn" title="Sign out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <header class="topbar">
+            <h1>My profile</h1>
+            <p class="subtitle">Your details and how the house can pay you back</p>
+        </header>
+
+        <div class="content">
+
+            <div th:if="${profileSuccess}" class="alert-success" th:text="${profileSuccess}"></div>
+            <div th:if="${profileError}" class="alert-danger" th:text="${profileError}"></div>
+
+            <div class="card">
+                <h2>Your details</h2>
+
+                <!-- enctype is required here so the profile picture file can be uploaded. -->
+                <form th:action="@{/profile/update}" th:object="${profile}" method="post" enctype="multipart/form-data">
+
+                    <div class="mb18" style="display:flex;align-items:center;gap:16px;">
+                        <img th:if="${hasProfilePicture}" th:src="@{/profile/picture}" alt="Your profile picture" class="avatar-current">
+                        <div th:unless="${hasProfilePicture}" class="avatar avatar-placeholder"
+                             th:style="${@avatarService.pictureUrl(profile.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(profile.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(profile.name))}"
+                             th:text="${@avatarService.pictureUrl(profile.name) != null ? '' : @avatarService.initials(profile.name)}">Mo</div>
+                        <div style="flex:1;">
+                            <label class="field-label" for="profilePicture">Profile picture</label>
+                            <input type="file" id="profilePicture" name="profilePicture" class="field" accept="image/png, image/jpeg">
+                            <div class="field-hint">JPG or PNG, up to 5MB. Leave empty to keep your current picture.</div>
+                        </div>
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="name">Full name</label>
+                        <input type="text" id="name" th:field="*{name}" class="field">
+                        <div class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="email">Email</label>
+                        <input type="email" id="email" th:field="*{email}" class="field">
+                        <div class="field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
+                        <div class="field-hint">Changing your email will log you out — you'll log back in with the new one.</div>
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="room">Room</label>
+                        <select id="room" th:field="*{room}" class="field">
+                            <option value="">Not set</option>
+                            <option value="Room 1">Room 1</option>
+                            <option value="Room 2">Room 2</option>
+                            <option value="Room 3">Room 3</option>
+                            <option value="Room 4">Room 4</option>
+                            <option value="Room 5">Room 5</option>
+                        </select>
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="newPassword">New password</label>
+                        <input type="password" id="newPassword" th:field="*{newPassword}" class="field"
+                               placeholder="Leave blank to keep your current password">
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="duty">Your responsibility</label>
+                        <input type="text" id="duty" th:field="*{duty}" class="field"
+                               placeholder="e.g. Wifi router admin, bin day reminders">
+                        <div class="field-error" th:if="${#fields.hasErrors('duty')}" th:errors="*{duty}"></div>
+                        <div class="field-hint">Optional — a duty you've taken on for the house, separate from the cleaning rota.</div>
+                    </div>
+
+                    <div class="mb18">
+                        <label class="field-label" for="paymentDetails">Payment details</label>
+                        <textarea id="paymentDetails" th:field="*{paymentDetails}" class="field" rows="2"
+                                  placeholder="e.g. IBAN, Revolut @handle, or PayPal.me link"></textarea>
+                        <div class="field-error" th:if="${#fields.hasErrors('paymentDetails')}" th:errors="*{paymentDetails}"></div>
+                        <div class="field-hint">Optional — shown so housemates know how to pay you back for bills. Don't enter your full card number here.</div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Save changes</button>
+                </form>
+            </div>
+
+            <div class="danger-card">
+                <h2 style="font-family:'Spectral',serif;font-weight:600;font-size:18px;margin:0 0 8px;">Delete account</h2>
+                <p>This permanently removes your Homie account. This can't be undone.</p>
+                <form th:action="@{/profile/delete}" method="post"
+                      onsubmit="return confirm('Are you sure you want to delete your account? This cannot be undone.');">
+                    <button type="submit" class="btn-danger">Delete my account</button>
+                </form>
+            </div>
+
+        </div>
+    </main>
+</div>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.querySelector('.sidebar-backdrop').classList.toggle('show');
+}
+</script>
+</body>
+</html>

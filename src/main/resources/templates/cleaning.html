@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Homie - Cleaning rota</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;family=Spectral:wght@400;500;600;700&amp;display=swap"
+          rel="stylesheet">
+
+    <style>
+        :root {
+            --bg: #EFE9DD; --card: #FAF6EE; --card-edge: #E7DECB; --ink: #2E2B26;
+            --muted: #857C6A; --muted2: #9A917D; --green: #4A7C59; --green-hover: #3F6B4D;
+            --green-deep: #3C5A40; --green-soft: #6B8E5A; --green-pale: #E6EDDC;
+            --terra: #9A4F38; --ochre: #8A6320; --ochre-bg: #F3E7CC; --terra-bg: #EFDBD2;
+        }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
+        body { font-family: 'Hanken Grotesk', sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-thumb { background: #D8CDB6; border-radius: 8px; border: 2px solid #EFE9DD; }
+        a { text-decoration: none; }
+
+
+        .menu-toggle { display: none; }
+        .sidebar-backdrop { display: none; }
+        .app { display: flex; min-height: 100vh; }
+
+        .sidebar { flex: none; width: 252px; background: var(--green-deep); color: #CCDAC0; display: flex;
+                   flex-direction: column; position: sticky; top: 0; height: 100vh; padding: 24px 18px; }
+        .sidebar-brand { display: flex; align-items: center; gap: 11px; padding: 4px 8px 22px; }
+        .sidebar-brand .mark { width: 34px; height: 34px; border-radius: 10px; background: #EAF0E2; color: var(--green-deep);
+                                display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; }
+        .sidebar-brand .name { font-family: 'Spectral', serif; font-weight: 600; font-size: 21px; letter-spacing: .04em; color: #F1F5EB; }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .nav-item { display: flex; align-items: center; gap: 13px; width: 100%; padding: 11px 14px; border: none;
+                    border-radius: 12px; font-size: 14.5px; cursor: pointer; text-align: left; background: transparent;
+                    color: #C2D2B6; font-weight: 500; }
+        .nav-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+        .nav-item.active { background: #F4EEE0; color: var(--green-deep); font-weight: 600; }
+        .sidebar-footer { border-top: 1px solid rgba(255,255,255,.1); padding-top: 14px; display: flex; align-items: center; gap: 11px; }
+        .sidebar-footer-link { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; color: inherit; }
+        .sidebar-footer .who-name { font-size: 14px; font-weight: 600; color: #F1F5EB; }
+        .sidebar-footer .who-room { font-size: 12px; color: #A9BB9D; }
+        .logout-btn { background: rgba(255,255,255,.08); border: none; border-radius: 9px; width: 32px; height: 32px;
+                      display: flex; align-items: center; justify-content: center; cursor: pointer; color: #CCDAC0; flex-shrink: 0; }
+        .logout-btn:hover { background: rgba(255,255,255,.16); }
+
+        .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .topbar { position: sticky; top: 0; z-index: 5; background: rgba(239,233,221,.86); backdrop-filter: blur(8px);
+                  border-bottom: 1px solid #E2D9C8; padding: 18px 36px; display: flex; align-items: center;
+                  justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+        .topbar h1 { font-family: 'Spectral', serif; font-weight: 600; font-size: 24px; margin: 0; line-height: 1.1; }
+        .topbar .subtitle { margin: 3px 0 0; font-size: 13.5px; color: var(--muted); }
+        .date-pill { display: flex; align-items: center; gap: 8px; background: var(--card); border: 1px solid var(--card-edge);
+                     border-radius: 11px; padding: 8px 13px; font-size: 13.5px; font-weight: 500; color: #6B6149; }
+
+        .content { padding: 34px 36px 56px; max-width: 1120px; width: 100%; margin: 0 auto; }
+
+        .avatar { border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;
+                  color: #FBF8F1; flex-shrink: 0; }
+        .avatar-38 { width: 38px; height: 38px; font-size: 14px; }
+        .avatar-40 { width: 40px; height: 40px; font-size: 14px; }
+        .avatar-64 { width: 64px; height: 64px; font-size: 23px; }
+
+        .card { background: var(--card); border: 1px solid var(--card-edge); border-radius: 18px; box-shadow: 0 1px 2px rgba(60,50,30,.04); }
+
+        .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .badge-done    { background: #EDEAE0; color: #7C7461; }
+        .badge-current { background: var(--green-pale); color: var(--green-deep); }
+        .badge-upcoming{ background: var(--bg); color: #8A8170; }
+
+        .hero { background: var(--green-deep); color: #EAF0E2; border-radius: 20px; padding: 28px 30px; margin: 0 0 26px;
+                display: flex; align-items: center; gap: 22px; position: relative; overflow: hidden;
+                box-shadow: 0 14px 34px rgba(60,90,64,.22); }
+        .hero .bubble { position: absolute; width: 260px; height: 260px; border-radius: 50%; background: rgba(255,253,246,.05);
+                         top: -120px; right: -40px; }
+        .hero-body { position: relative; }
+        .hero-eyebrow { font-size: 12.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #AFC4A4; margin: 0 0 6px; }
+        .hero-title { font-family: 'Spectral', serif; font-size: 30px; margin: 0 0 6px; }
+        .hero-note { font-size: 14.5px; color: #CBD8C0; }
+
+        h2.section-title { font-family: 'Spectral', serif; font-weight: 600; font-size: 19px; margin: 0 0 14px; }
+
+        .rota-list { padding: 10px 12px; }
+        .rota-item { display: flex; align-items: center; gap: 15px; padding: 13px 14px; border-radius: 13px; margin: 2px 0; }
+        .rota-item.current { background: #EEF2E6; border: 1px solid #D5E0C7; }
+        .rota-num { font-family: 'Spectral', serif; font-size: 16px; width: 28px; text-align: center; color: #B5A78C; }
+        .rota-name { font-weight: 600; font-size: 15.5px; color: var(--ink); }
+        .rota-week { font-size: 12.5px; color: var(--muted2); }
+
+        @media (max-width: 700px) {
+            .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 60; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 8px 0 24px rgba(0,0,0,.18); }
+            .sidebar.open { transform: translateX(0); }
+            .menu-toggle { display: flex; align-items: center; justify-content: center; position: fixed; top: 14px; left: 14px; z-index: 70; width: 40px; height: 40px; border-radius: 10px; background: var(--green-deep); color: #EAF0E2; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(0,0,0,.2); }
+            .sidebar-backdrop.show { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 55; }
+            .hero { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
+</head>
+<body>
+<button class="menu-toggle" onclick="toggleSidebar()" aria-label="Open menu">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+    </button>
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <a th:href="@{/}" class="sidebar-brand" style="text-decoration:none;cursor:pointer;">
+            <div class="mark">H</div>
+            <span class="name">HOMIE</span>
+        </a>
+        <nav class="sidebar-nav">
+            <a th:href="@{/}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5M5.5 10v9.5h13V10M9.5 19.5v-5h5v5"></path></svg>
+                <span>Dashboard</span>
+            </a>
+            <a th:href="@{/cleaning}" class="nav-item active">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.4c.4 2.7 1.9 4.2 4.6 4.6-2.7.4-4.2 1.9-4.6 4.6-.4-2.7-1.9-4.2-4.6-4.6 2.7-.4 4.2-1.9 4.6-4.6ZM18.5 13.5c.2 1.2.9 1.9 2.1 2.1-1.2.2-1.9.9-2.1 2.1-.2-1.2-.9-1.9-2.1-2.1 1.2-.2 1.9-.9 2.1-2.1Z"></path></svg>
+                <span>Cleaning rota</span>
+            </a>
+            <a th:href="@{/schedule}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9.5 7V4.8h5V7M6.5 7l1 13h9l1-13M10 11v5M14 11v5"></path></svg>
+                <span>Washing &amp; bins</span>
+            </a>
+            <a th:href="@{/bills}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12v18l-2-1.4-2 1.4-2-1.4-2 1.4-2-1.4L6 21ZM9 8.5h6M9 12.5h6"></path></svg>
+                <span>Bills</span>
+            </a>
+            <a th:href="@{/members}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 20v-1.5a3.5 3.5 0 0 0-3.5-3.5H8a3.5 3.5 0 0 0-3.5 3.5V20M10.5 11.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M19.5 20v-1.5a3.5 3.5 0 0 0-2.6-3.4M15.5 4.6a3.5 3.5 0 0 1 0 6.8"></path></svg>
+                <span>Housemates</span>
+            </a>
+            <a th:href="@{/announcements}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
+                <span>Announcements</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
+                <div class="avatar avatar-38" th:if="${currentUser}"
+                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
+                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                <div style="flex:1;min-width:0;">
+                    <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                </div>
+            </a>
+            <form th:action="@{/logout}" method="post" class="m-0">
+                <button type="submit" class="logout-btn" title="Sign out">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"></path></svg>
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+        <header class="topbar">
+            <div>
+                <h1>Cleaning rota</h1>
+                <p class="subtitle">One person, one week, in fixed order</p>
+            </div>
+        </header>
+
+        <div class="content">
+
+            <div class="hero">
+                <div class="bubble"></div>
+                <div class="avatar avatar-64" th:style="${@avatarService.pictureUrl(currentCleaner) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentCleaner) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentCleaner))}"
+                     th:text="${@avatarService.pictureUrl(currentCleaner) != null ? '' : @avatarService.initials(currentCleaner)}">Mo</div>
+                <div class="hero-body">
+                    <div class="hero-eyebrow">This week</div>
+                    <div class="hero-title" th:text="${currentCleaner + ' is cleaning this week'}">Momo is cleaning this week</div>
+                    <div class="hero-note">One person each week, in fixed order. Then we loop back around.</div>
+                </div>
+            </div>
+
+            <h2 class="section-title">The full rotation</h2>
+            <div class="card rota-list">
+                <div th:each="r,iter : ${rota}" th:class="${r.current} ? 'rota-item current' : 'rota-item'">
+                    <div class="rota-num" th:text="${#numbers.formatInteger(iter.count, 2)}">01</div>
+                    <div class="avatar avatar-40" th:style="${@avatarService.pictureUrl(r.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.name))}"
+                         th:text="${@avatarService.pictureUrl(r.name) != null ? '' : @avatarService.initials(r.name)}">Mo</div>
+                    <div style="flex:1;min-width:0;">
+                        <div class="rota-name" th:text="${r.name}">Momo</div>
+                        <div class="rota-week" th:text="${'Week of ' + #temporals.format(r.weekStart, 'MMM d')}">Week of Jun 28</div>
+                    </div>
+                    <span th:class="${'badge badge-' + r.status}"
+                          th:text="${r.status == 'current' ? 'This week' : (r.status == 'done' ? 'Done' : 'Upcoming')}">This week</span>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+<script>
+function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.querySelector('.sidebar-backdrop').classList.toggle('show');
+}
+</script>
+</body>
+</html>
