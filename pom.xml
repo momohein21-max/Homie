@@ -55,6 +55,28 @@
 			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
 		</dependency>
 
+		<!--
+			JSON support (Jackson) for the /api/translate endpoint - it takes
+			a JSON request body and returns a JSON response so the "Translate"
+			button's JavaScript can call it directly. spring-boot-starter-web
+			used to pull this in automatically via spring-boot-starter-json,
+			but neither spring-boot-starter-webmvc NOR spring-boot-starter-json
+			actually bring Jackson's classes onto the classpath in this
+			project's setup (confirmed by testing both), so jackson-databind
+			is declared directly here instead. No version number needed -
+			spring-boot-starter-parent's dependency management picks the
+			right one to match everything else. Since Spring Boot's own
+			Jackson auto-configuration isn't reliably kicking in here either,
+			TranslationService builds its own ObjectMapper directly rather
+			than expecting one to be auto-registered as a bean - Spring MVC's
+			built-in JSON message converter for @RequestBody/@ResponseBody
+			only needs the Jackson classes to be present, not a bean.
+		-->
+		<dependency>
+			<groupId>com.fasterxml.jackson.core</groupId>
+			<artifactId>jackson-databind</artifactId>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>

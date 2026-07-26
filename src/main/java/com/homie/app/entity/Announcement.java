@@ -46,15 +46,23 @@ public class Announcement {
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
 
+    // Which house this notice belongs to - see Bill.house for why this is
+    // stored explicitly rather than derived from createdBy.getHouse().
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "house_id", nullable = false)
+    private House house;
+
     public Announcement() {
     }
 
-    public Announcement(String title, String category, String body, LocalDate createdDate, User createdBy) {
+    public Announcement(String title, String category, String body, LocalDate createdDate,
+                         User createdBy, House house) {
         this.title = title;
         this.category = category;
         this.body = body;
         this.createdDate = createdDate;
         this.createdBy = createdBy;
+        this.house = house;
     }
 
     public Long getId() {
@@ -103,6 +111,14 @@ public class Announcement {
 
     public void setCreatedBy(User createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public House getHouse() {
+        return house;
+    }
+
+    public void setHouse(House house) {
+        this.house = house;
     }
 
     // A short one-line preview for the list view, cut to ~140 characters at

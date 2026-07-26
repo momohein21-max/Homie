@@ -42,10 +42,37 @@ public class User {
     @Column(nullable = false)
     private String role;
 
-    // Which of the house's 5 rooms this housemate lives in, e.g. "Room 4".
-    // Optional and self-selected on the profile page (some rooms are shared
-    // by two housemates, so this is not a unique constraint).
-    private String room;
+    // Which House this housemate belongs to. Every real account has one -
+    // registration always either starts a new house or joins one with an
+    // invite code (see RegistrationDto/HouseService) - so there's no such
+    // thing as a housemate without a house in practice. The column itself
+    // is nullable only because of a brief chicken-and-egg moment when a
+    // brand new house is created: House.createdBy needs a real user id to
+    // point at, so that first user is saved once with house = null and
+    // then immediately updated once the house exists (see
+    // HouseService.createHouse). Everything else in the app (rooms, bills,
+    // announcements, the cleaning rota) is scoped through this
+    // relationship, which is what lets any number of independent houses
+    // use Homie at once without seeing each other's data.
+    @ManyToOne
+    @JoinColumn(name = "house_id")
+    private House house;
+
+    // Which room within their house this housemate lives in. Optional and
+    // self-selected on the profile page (some rooms are shared by more
+    // than one housemate, so this is not a unique constraint). A real
+    // relationship to a Room row now, rather than a free-text "Room 4"
+    // string, since houses have different, changeable sets of rooms.
+    @ManyToOne
+    @JoinColumn(name = "room_id")
+    private Room room;
+
+    // This housemate's position in their house's cleaning rota (0 = first).
+    // Assigned automatically when they join (added to the end), and
+    // reorderable afterwards by the house owner - see HouseService. Kept
+    // as a plain integer per house rather than a single global order, since
+    // every house has its own independent rota.
+    private Integer cleaningOrder;
 
     // An optional house responsibility the housemate has taken on, e.g.
     // "Wifi router admin" or "Bin day reminders". This is separate from
@@ -134,12 +161,39 @@ public class User {
         this.role = role;
     }
 
-    public String getRoom() {
+    public House getHouse() {
+        return house;
+    }
+
+    public void setHouse(House house) {
+        this.house = house;
+    }
+
+    public Room getRoom() {
         return room;
     }
 
-    public void setRoom(String room) {
+    public void setRoom(Room room) {
         this.room = room;
+    }
+
+    public Integer getCleaningOrder() {
+        return cleaningOrder;
+    }
+
+    public void setCleaningOrder(Integer cleaningOrder) {
+        this.cleaningOrder = cleaningOrder;
+    }
+
+    // True if this housemate is the one who created their house, meaning
+    // they're allowed to resize/rename rooms and reorder the cleaning rota
+    // (see HouseController and HouseService). Every house has exactly one
+    // owner - whoever created it.
+    @Transient
+    public boolean isHouseOwner() {
+        return house != null && house.getCreatedBy() != null
+                && house.getCreatedBy().getId() != null
+                && house.getCreatedBy().getId().equals(this.id);
     }
 
     public String getDuty() {

@@ -27,8 +27,10 @@ public class ProfileUpdateDto {
     // Optional. Left blank = don't change the password.
     private String newPassword;
 
-    // Optional. One of "Room 1".."Room 5" (selected from a dropdown).
-    private String room;
+    // Optional. The id of one of this housemate's own house's rooms
+    // (selected from a dropdown built from that house's actual rooms -
+    // see ProfileController). Null means "Not set".
+    private Long roomId;
 
     // Optional. E.g. "Wifi router admin" or "Bin day reminders".
     @Size(max = 255, message = "Keep your duty under 255 characters")
@@ -62,12 +64,12 @@ public class ProfileUpdateDto {
         this.newPassword = newPassword;
     }
 
-    public String getRoom() {
-        return room;
+    public Long getRoomId() {
+        return roomId;
     }
 
-    public void setRoom(String room) {
-        this.room = room;
+    public void setRoomId(Long roomId) {
+        this.roomId = roomId;
     }
 
     public String getDuty() {

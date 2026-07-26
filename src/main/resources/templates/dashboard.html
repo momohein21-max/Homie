@@ -158,15 +158,19 @@
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
                 <span>Announcements</span>
             </a>
+            <a th:href="@{/house}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" stroke-linejoin="round"></path><path d="M9.5 20v-6h5v6"></path></svg>
+                <span>Manage house</span>
+            </a>
         </nav>
         <div class="sidebar-footer">
             <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
                 <div class="avatar avatar-38" th:if="${currentUser}"
-                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
-                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                     th:style="${@avatarService.pictureUrl(currentUser) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser))}"
+                     th:text="${@avatarService.pictureUrl(currentUser) != null ? '' : @avatarService.initials(currentUser)}">Mo</div>
                 <div style="flex:1;min-width:0;">
                     <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
-                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room.name : 'No room set'}">Room 4</div>
                 </div>
             </a>
             <form th:action="@{/logout}" method="post" class="m-0">
@@ -204,19 +208,19 @@
                     <div class="stat-value">
                         <div class="avatar avatar-40" th:style="${@avatarService.pictureUrl(cleanerThisWeek) != null ? ('background-image:url(' + @avatarService.pictureUrl(cleanerThisWeek) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(cleanerThisWeek))}"
                              th:text="${@avatarService.pictureUrl(cleanerThisWeek) != null ? '' : @avatarService.initials(cleanerThisWeek)}">Mo</div>
-                        <span th:text="${cleanerThisWeek}">Momo</span>
+                        <span th:text="${cleanerThisWeek != null ? cleanerThisWeek.name : '—'}">Momo</span>
                     </div>
                     <div class="stat-note"
-                         th:text="${currentUser != null and cleanerThisWeek == currentUser.name ? 'That is you — thanks for keeping us tidy!' : 'Keeping the house tidy this week.'}">
+                         th:text="${currentUser != null and cleanerThisWeek != null and cleanerThisWeek.id == currentUser.id ? 'That is you — thanks for keeping us tidy!' : 'Keeping the house tidy this week.'}">
                         That's you — thanks for keeping us tidy!
                     </div>
                 </a>
                 <!-- Bins today -->
                 <a th:href="@{/schedule}" class="stat-card plain">
                     <div class="stat-label">Washing &amp; bins today</div>
-                    <div class="stat-value plain-title" th:text="${roomToday} ?: 'Weekend'">Room 3</div>
+                    <div class="stat-value plain-title" th:text="${roomToday != null ? roomToday.name : 'Weekend'}">Room 3</div>
                     <div class="stat-note"
-                         th:text="${roomToday != null ? (membersToday + ' are on today') : 'No bins today — enjoy it'}">
+                         th:text="${roomToday != null ? (roomToday.occupantNames + ' are on today') : 'No bins today — enjoy it'}">
                         Ágatha &amp; Julia are on today
                     </div>
                 </a>
@@ -232,7 +236,7 @@
                     <div class="stat-value plain-title">
                         <div class="avatar avatar-36" th:style="${@avatarService.pictureUrl(nextCleaner) != null ? ('background-image:url(' + @avatarService.pictureUrl(nextCleaner) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(nextCleaner))}"
                              th:text="${@avatarService.pictureUrl(nextCleaner) != null ? '' : @avatarService.initials(nextCleaner)}">Ed</div>
-                        <span th:text="${nextCleaner}">Edgar</span>
+                        <span th:text="${nextCleaner != null ? nextCleaner.name : '—'}">Edgar</span>
                     </div>
                     <div class="stat-note">Coming up next</div>
                 </a>
@@ -248,8 +252,8 @@
                     <div th:if="${#lists.isEmpty(announcements)}" class="empty-note">No announcements yet.</div>
                     <a th:each="a : ${announcements}" th:href="@{'/announcements/' + ${a.id}}" class="ann-row" style="color:inherit;">
                         <div class="avatar avatar-36" th:if="${a.createdBy != null}"
-                             th:style="${@avatarService.pictureUrl(a.createdBy.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(a.createdBy.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(a.createdBy.name))}"
-                             th:text="${@avatarService.pictureUrl(a.createdBy.name) != null ? '' : @avatarService.initials(a.createdBy.name)}">Ju</div>
+                             th:style="${@avatarService.pictureUrl(a.createdBy) != null ? ('background-image:url(' + @avatarService.pictureUrl(a.createdBy) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(a.createdBy))}"
+                             th:text="${@avatarService.pictureUrl(a.createdBy) != null ? '' : @avatarService.initials(a.createdBy)}">Ju</div>
                         <div style="flex:1;min-width:0;">
                             <div class="title" th:text="${a.title}">House meeting Sunday</div>
                             <div class="meta" th:text="${(a.createdBy != null ? a.createdBy.name : 'A former housemate') + ' · ' + a.dateLabel}">Julia · Jun 22</div>
@@ -264,9 +268,9 @@
                         <a th:href="@{/cleaning}">View all</a>
                     </div>
                     <div th:each="r : ${rotaMini}" th:class="${r.current} ? 'rota-row current' : 'rota-row'">
-                        <div class="avatar avatar-32" th:style="${@avatarService.pictureUrl(r.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.name))}"
-                             th:text="${@avatarService.pictureUrl(r.name) != null ? '' : @avatarService.initials(r.name)}">Mo</div>
-                        <div class="rname" th:text="${r.name}">Momo</div>
+                        <div class="avatar avatar-32" th:style="${@avatarService.pictureUrl(r.user) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.user) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.user))}"
+                             th:text="${@avatarService.pictureUrl(r.user) != null ? '' : @avatarService.initials(r.user)}">Mo</div>
+                        <div class="rname" th:text="${r.user.name}">Momo</div>
                         <span th:class="${r.current} ? 'badge badge-current' : 'badge badge-upcoming'"
                               th:text="${r.current} ? 'This week' : 'Upcoming'">This week</span>
                     </div>

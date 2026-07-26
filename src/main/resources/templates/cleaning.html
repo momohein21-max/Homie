@@ -139,15 +139,19 @@
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
                 <span>Announcements</span>
             </a>
+            <a th:href="@{/house}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" stroke-linejoin="round"></path><path d="M9.5 20v-6h5v6"></path></svg>
+                <span>Manage house</span>
+            </a>
         </nav>
         <div class="sidebar-footer">
             <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
                 <div class="avatar avatar-38" th:if="${currentUser}"
-                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
-                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                     th:style="${@avatarService.pictureUrl(currentUser) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser))}"
+                     th:text="${@avatarService.pictureUrl(currentUser) != null ? '' : @avatarService.initials(currentUser)}">Mo</div>
                 <div style="flex:1;min-width:0;">
                     <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
-                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room.name : 'No room set'}">Room 4</div>
                 </div>
             </a>
             <form th:action="@{/logout}" method="post" class="m-0">
@@ -175,7 +179,7 @@
                      th:text="${@avatarService.pictureUrl(currentCleaner) != null ? '' : @avatarService.initials(currentCleaner)}">Mo</div>
                 <div class="hero-body">
                     <div class="hero-eyebrow">This week</div>
-                    <div class="hero-title" th:text="${currentCleaner + ' is cleaning this week'}">Momo is cleaning this week</div>
+                    <div class="hero-title" th:text="${currentCleaner.name + ' is cleaning this week'}">Momo is cleaning this week</div>
                     <div class="hero-note">One person each week, in fixed order. Then we loop back around.</div>
                 </div>
             </div>
@@ -184,10 +188,10 @@
             <div class="card rota-list">
                 <div th:each="r,iter : ${rota}" th:class="${r.current} ? 'rota-item current' : 'rota-item'">
                     <div class="rota-num" th:text="${#numbers.formatInteger(iter.count, 2)}">01</div>
-                    <div class="avatar avatar-40" th:style="${@avatarService.pictureUrl(r.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.name))}"
-                         th:text="${@avatarService.pictureUrl(r.name) != null ? '' : @avatarService.initials(r.name)}">Mo</div>
+                    <div class="avatar avatar-40" th:style="${@avatarService.pictureUrl(r.user) != null ? ('background-image:url(' + @avatarService.pictureUrl(r.user) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(r.user))}"
+                         th:text="${@avatarService.pictureUrl(r.user) != null ? '' : @avatarService.initials(r.user)}">Mo</div>
                     <div style="flex:1;min-width:0;">
-                        <div class="rota-name" th:text="${r.name}">Momo</div>
+                        <div class="rota-name" th:text="${r.user.name}">Momo</div>
                         <div class="rota-week" th:text="${'Week of ' + #temporals.format(r.weekStart, 'MMM d')}">Week of Jun 28</div>
                     </div>
                     <span th:class="${'badge badge-' + r.status}"

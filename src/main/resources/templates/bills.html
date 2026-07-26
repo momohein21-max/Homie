@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Homie - Bills</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -133,6 +135,22 @@
         .alert-warning { background: var(--ochre-bg); color: var(--ochre); border-radius: 12px; padding: 12px 15px;
                           font-size: 14px; margin: 0 0 18px; }
 
+        .translate-toggle { margin-top: 14px; }
+        .translate-toggle > summary { font-size: 13px; font-weight: 600; color: var(--green-soft); cursor: pointer; list-style: none; }
+        .translate-toggle > summary::-webkit-details-marker { display: none; }
+        .translate-toggle > summary::before { content: "🌐 "; }
+        .translate-row { display: flex; gap: 8px; margin-top: 10px; }
+        .translate-input { flex: 1; padding: 8px 11px; border: 1px solid var(--input-edge); border-radius: 9px;
+                            background: var(--input-bg); font-size: 13.5px; color: var(--ink); font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-translate-sm { background: var(--green-pale); border: 1px solid #D5E0C7; color: #466B3E; border-radius: 9px;
+                             font-weight: 600; padding: 8px 13px; font-size: 13px; cursor: pointer; white-space: nowrap;
+                             font-family: 'Hanken Grotesk', sans-serif; }
+        .btn-translate-sm:hover { background: #DEE9D3; }
+        .btn-translate-sm:disabled { opacity: .6; cursor: default; }
+        .translate-result-sm { margin-top: 10px; background: var(--input-bg); border: 1px solid #ECE3D2; border-radius: 9px;
+                                padding: 10px 12px; font-size: 13.5px; color: #473F30; }
+        .translate-result-sm.error { color: var(--terra); background: var(--terra-bg); border-color: var(--terra-bg); }
+
         @media (max-width: 900px) { .stat-grid { grid-template-columns: 1fr; } .who-grid { grid-template-columns: 1fr; } }
         @media (max-width: 700px) { .sidebar { position: fixed; top: 0; left: 0; height: 100vh; z-index: 60; transform: translateX(-100%); transition: transform .25s ease; box-shadow: 8px 0 24px rgba(0,0,0,.18); }
             .sidebar.open { transform: translateX(0); }
@@ -178,15 +196,19 @@
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
                 <span>Announcements</span>
             </a>
+            <a th:href="@{/house}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" stroke-linejoin="round"></path><path d="M9.5 20v-6h5v6"></path></svg>
+                <span>Manage house</span>
+            </a>
         </nav>
         <div class="sidebar-footer">
             <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
                 <div class="avatar avatar-38" th:if="${currentUser}"
-                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
-                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                     th:style="${@avatarService.pictureUrl(currentUser) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser))}"
+                     th:text="${@avatarService.pictureUrl(currentUser) != null ? '' : @avatarService.initials(currentUser)}">Mo</div>
                 <div style="flex:1;min-width:0;">
                     <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
-                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room.name : 'No room set'}">Room 4</div>
                 </div>
             </a>
             <form th:action="@{/logout}" method="post" class="m-0">
@@ -265,13 +287,28 @@
 
             <p th:if="${#lists.isEmpty(bills)}" style="color:var(--muted);">No bills added yet. Use "Add a bill" above to add the first one.</p>
 
+            <datalist id="languageOptions">
+                <option value="Spanish"></option>
+                <option value="French"></option>
+                <option value="Portuguese"></option>
+                <option value="Italian"></option>
+                <option value="German"></option>
+                <option value="Polish"></option>
+                <option value="Romanian"></option>
+                <option value="Mandarin Chinese"></option>
+                <option value="Hindi"></option>
+                <option value="Arabic"></option>
+                <option value="Ukrainian"></option>
+                <option value="Portuguese (Brazil)"></option>
+            </datalist>
+
             <div class="bill-list">
                 <div class="card bill-card" th:each="bill : ${bills}">
                     <div class="bill-row">
                         <div th:class="${'bill-icon ' + (bill.status == 'Paid' ? 'paid' : (bill.status == 'Overdue' ? 'overdue' : 'pending'))}"
                              th:text="${bill.initial}">E</div>
                         <div style="flex:1;min-width:0;">
-                            <div class="bill-name" th:text="${bill.description}">Electricity</div>
+                            <div class="bill-name" th:id="${'billName-' + bill.id}" th:text="${bill.description}">Electricity</div>
                             <div class="bill-meta"
                                  th:text="${(bill.status == 'Overdue' ? 'Was due ' : 'Due ') + #temporals.format(bill.dueDate, 'MMM d') + ' · €' + #numbers.formatDecimal(bill.shareAmount, 1, 2) + ' each'}">
                                 Due Jun 28 · €31.21 each
@@ -293,8 +330,8 @@
                         <div class="who-grid">
                             <div th:each="payment : ${bill.payments}">
                             <div class="who-row" th:if="${payment.user != null}">
-                                <div class="avatar avatar-32" th:style="${@avatarService.pictureUrl(payment.user.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(payment.user.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(payment.user.name))}"
-                                     th:text="${@avatarService.pictureUrl(payment.user.name) != null ? '' : @avatarService.initials(payment.user.name)}">Mo</div>
+                                <div class="avatar avatar-32" th:style="${@avatarService.pictureUrl(payment.user) != null ? ('background-image:url(' + @avatarService.pictureUrl(payment.user) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(payment.user))}"
+                                     th:text="${@avatarService.pictureUrl(payment.user) != null ? '' : @avatarService.initials(payment.user)}">Mo</div>
                                 <span class="wname" th:text="${payment.user.name}">Julia</span>
 
                                 <!-- Only the bill's creator can click to toggle -->
@@ -309,6 +346,18 @@
                             </div>
                             </div>
                         </div>
+
+                        <details class="translate-toggle">
+                            <summary>Translate description</summary>
+                            <div class="translate-row">
+                                <input type="text" th:id="${'translateLang-' + bill.id}" class="translate-input"
+                                       list="languageOptions" placeholder="e.g. Spanish, Polish...">
+                                <button type="button" class="btn-translate-sm"
+                                        th:id="${'translateBtn-' + bill.id}"
+                                        th:onclick="'translateBillDescription(' + ${bill.id} + ')'">Translate</button>
+                            </div>
+                            <div th:id="${'translateResult-' + bill.id}" class="translate-result-sm" style="display:none;"></div>
+                        </details>
 
                         <!-- Only the bill's creator can edit its details or delete it -->
                         <div th:if="${bill.createdBy != null and bill.createdBy.id == currentUserId}">
@@ -353,6 +402,64 @@
 function toggleSidebar() {
     document.getElementById('sidebar').classList.toggle('open');
     document.querySelector('.sidebar-backdrop').classList.toggle('show');
+}
+
+// Translates one bill's description in place. billId picks out which
+// bill card's elements to read from/write to, since the page can have
+// many bills open at once and each needs its own input/button/result.
+function translateBillDescription(billId) {
+    var langInput = document.getElementById('translateLang-' + billId);
+    var resultBox = document.getElementById('translateResult-' + billId);
+    var button = document.getElementById('translateBtn-' + billId);
+    var lang = langInput.value.trim();
+
+    if (!lang) {
+        resultBox.textContent = 'Please type a language first.';
+        resultBox.className = 'translate-result-sm error';
+        resultBox.style.display = 'block';
+        return;
+    }
+
+    var original = document.getElementById('billName-' + billId).textContent.trim();
+
+    button.disabled = true;
+    button.textContent = 'Translating...';
+    resultBox.className = 'translate-result-sm';
+    resultBox.textContent = 'Translating...';
+    resultBox.style.display = 'block';
+
+    var csrfToken = document.querySelector('meta[name="_csrf"]').content;
+    var csrfHeader = document.querySelector('meta[name="_csrf_header"]').content;
+    var headers = { 'Content-Type': 'application/json' };
+    headers[csrfHeader] = csrfToken;
+
+    fetch('/api/translate', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ text: original, targetLanguage: lang })
+    })
+        .then(function (response) {
+            return response.json().then(function (data) {
+                return { ok: response.ok, data: data };
+            });
+        })
+        .then(function (result) {
+            if (result.ok && result.data.translatedText) {
+                resultBox.textContent = result.data.translatedText;
+                resultBox.className = 'translate-result-sm';
+            } else {
+                resultBox.textContent = result.data.error || 'Something went wrong translating this.';
+                resultBox.className = 'translate-result-sm error';
+            }
+        })
+        .catch(function () {
+            resultBox.textContent = 'Could not reach the translation service. Please try again.';
+            resultBox.className = 'translate-result-sm error';
+        })
+        .finally(function () {
+            button.disabled = false;
+            button.textContent = 'Translate';
+        });
 }
 </script>
 </body>

@@ -1,5 +1,10 @@
 package com.homie.app.service;
 
+import com.homie.app.entity.House;
+import com.homie.app.entity.Room;
+import com.homie.app.entity.User;
+import com.homie.app.repository.RoomRepository;
+import com.homie.app.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 import java.time.DayOfWeek;
@@ -12,301 +17,269 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Works out two things from the house rules, for any given date:
+ * Works out two things from a house's own data, for any given date:
  *
- *  1) The cleaning rota - one person per week, rotating in a fixed order,
- *     looping back to the start after the last person.
- *  2) The washing/bins room - a fixed map of weekday to room.
+ *  1) The cleaning rota - one member per week, rotating through that
+ *     house's members in their chosen order, looping back to the start.
+ *  2) The bins/washing room - a fixed weekday per room (Room ranked 1st
+ *     gets Monday, 2nd gets Tuesday, and so on), so each room always does
+ *     bins on the same day every week, same as before.
  *
- * Keeping this logic here (not in the controller) means it is easy to unit
- * test and reuse from the scheduled reminder job later.
+ * Everything here is now calculated PER HOUSE rather than from one fixed,
+ * hardcoded set of names and rooms - this is what lets any number of
+ * different-sized houses each have their own independent rota. Both
+ * rotations are anchored to the house's own creation date, so a brand new
+ * house always starts its cycle at week 1 / its first member, rather than
+ * wherever a single shared calendar date would happen to land.
  *
- * NOTE: These names and dates are fixed house data for now. In a later sprint
- * they will come from the database (Member entity with a rotation position),
- * but the calculation itself will not change.
+ * A house with more than 7 rooms is a known edge case: only the first 7
+ * (by room order) get a fixed bins weekday, since a week only has 7 days.
+ * Extra rooms beyond that don't currently get a bins day assigned - fine
+ * for the shared houses Homie is aimed at, but worth knowing about.
  */
 @Service
 public class ScheduleService {
 
-    // The cleaning order. Index 0 is the anchor person for the anchor week.
-    private static final List<String> CLEANING_ORDER = List.of(
-            "Julia", "Edgar", "Momo", "Sheron", "Luis",
-            "Lívia", "Ágatha", "Allyne", "Edecilmar"
-    );
-
-    // The Saturday that Julia's week starts (17 May 2025). Each new week
-    // begins on this weekday. We count whole weeks from here to find who is on.
-    private static final LocalDate ANCHOR = LocalDate.of(2025, 5, 17);
-
     private static final DateTimeFormatter DAY_MONTH = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
 
+    private final UserRepository userRepository;
+    private final RoomRepository roomRepository;
+
+    public ScheduleService(UserRepository userRepository, RoomRepository roomRepository) {
+        this.userRepository = userRepository;
+        this.roomRepository = roomRepository;
+    }
+
+    // A house's members, in cleaning-rota order.
+    public List<User> orderedMembers(House house) {
+        return userRepository.findByHouseOrderByCleaningOrderAsc(house);
+    }
+
+    // A house's rooms, in bins-rota order.
+    public List<Room> orderedRooms(House house) {
+        return roomRepository.findByHouseOrderByOrderIndexAsc(house);
+    }
+
     /**
-     * Returns the person responsible for cleaning during the week containing
-     * the given date.
+     * Returns the member responsible for cleaning during the week
+     * containing the given date, or null if the house somehow has no
+     * members yet (shouldn't happen - every house has at least its owner).
      */
-    public String cleanerFor(LocalDate date) {
-        return CLEANING_ORDER.get(indexFor(date));
+    public User cleanerFor(House house, LocalDate date) {
+        List<User> members = orderedMembers(house);
+        if (members.isEmpty()) {
+            return null;
+        }
+        return members.get(indexFor(house, date, members.size()));
     }
 
-    // The position in CLEANING_ORDER that is "on" for the given date's week.
-    private int indexFor(LocalDate date) {
-        long weeks = ChronoUnit.WEEKS.between(ANCHOR, date);
-        // Java's % can be negative for dates before the anchor, so we add the
-        // size and take % again to always land on a valid list index.
-        return (int) (((weeks % CLEANING_ORDER.size()) + CLEANING_ORDER.size())
-                % CLEANING_ORDER.size());
+    // The position in the ordered member list that is "on" for the given
+    // date's week, counting whole weeks from the house's creation date.
+    private int indexFor(House house, LocalDate date, int memberCount) {
+        long weeks = ChronoUnit.WEEKS.between(house.getCreatedDate(), date);
+        return (int) Math.floorMod(weeks, memberCount);
     }
 
     /**
-     * Returns the next few people due to clean after the current week,
+     * True if the given date is the first day of a new cleaning rota week
+     * (i.e. it falls on the same weekday as the house's creation date).
+     * Useful for a daily reminder job so it only notifies the incoming
+     * cleaner once, on the day their week begins.
+     */
+    public boolean isRotaWeekStart(House house, LocalDate date) {
+        return date.getDayOfWeek() == house.getCreatedDate().getDayOfWeek();
+    }
+
+    /**
+     * Returns the next few members due to clean after the current week,
      * in order, for showing an "up next" list.
      */
-    public List<String> upNextCleaners(LocalDate date, int howMany) {
-        int idx = indexFor(date);
-        List<String> result = new ArrayList<>();
+    public List<User> upNextCleaners(House house, LocalDate date, int howMany) {
+        List<User> members = orderedMembers(house);
+        List<User> result = new ArrayList<>();
+        if (members.isEmpty()) {
+            return result;
+        }
+        int idx = indexFor(house, date, members.size());
         for (int i = 1; i <= howMany; i++) {
-            int index = Math.floorMod(idx + i, CLEANING_ORDER.size());
-            result.add(CLEANING_ORDER.get(index));
+            result.add(members.get(Math.floorMod(idx + i, members.size())));
         }
         return result;
     }
 
     /**
-     * Returns which room is on washing + bins for the given date's weekday,
-     * or null if it is a weekend (no room assigned).
-     *
-     * Fixed mapping:
-     *   Monday    -> Room 3
-     *   Tuesday   -> Room 1
-     *   Wednesday -> Room 4
-     *   Thursday  -> Room 5
-     *   Friday    -> Room 2
+     * Returns which room is on bins/washing duty for the given date, or
+     * null if the house has no rooms, or the date's weekday doesn't have a
+     * room assigned (a house with fewer than 7 rooms leaves some weekdays
+     * unassigned - the same way the original fixed 5-room house left
+     * weekends unassigned).
      */
-    public String roomOnDutyFor(LocalDate date) {
-        return roomForWeekday(date.getDayOfWeek());
-    }
-
-    // Exposed so other code (and tests) can read the order if needed.
-    public List<String> getCleaningOrder() {
-        return CLEANING_ORDER;
-    }
-
-    // Which members live in each room (fixed house data for now).
-    // Used to show names next to each room on the washing/bins page.
-    private static final java.util.Map<String, String> ROOM_MEMBERS = java.util.Map.of(
-            "Room 1", "Edgar",
-            "Room 2", "Allyne & Lívia",
-            "Room 3", "Ágatha & Julia",
-            "Room 4", "Sheron & Momo",
-            "Room 5", "Edecilmar & Luis"
-    );
-
-    // The names of whoever lives in the given room.
-    public String membersOf(String room) {
-        if (room == null) return "";
-        return ROOM_MEMBERS.getOrDefault(room, "");
-    }
-
-    /**
-     * A small holder describing one room and who lives in it, for the
-     * "Rooms in the house" panel.
-     */
-    public static class Room {
-        private final String name;
-        private final String members;
-        private final String type;
-        public Room(String name, String members, String type) {
-            this.name = name; this.members = members; this.type = type;
+    public Room roomOnDutyFor(House house, LocalDate date) {
+        List<Room> rooms = orderedRooms(house);
+        int weekdayIndex = date.getDayOfWeek().getValue() - 1; // Monday = 0
+        if (weekdayIndex >= rooms.size()) {
+            return null;
         }
-        public String getName() { return name; }
-        public String getMembers() { return members; }
-        public String getType() { return type; }
+        return rooms.get(weekdayIndex);
     }
 
-    // All five rooms in order, with members and single/shared type.
-    public List<Room> allRooms() {
-        List<Room> rooms = new ArrayList<>();
-        rooms.add(new Room("Room 1", ROOM_MEMBERS.get("Room 1"), "Single (1 person)"));
-        rooms.add(new Room("Room 2", ROOM_MEMBERS.get("Room 2"), "Shared (2 people)"));
-        rooms.add(new Room("Room 3", ROOM_MEMBERS.get("Room 3"), "Shared (2 people)"));
-        rooms.add(new Room("Room 4", ROOM_MEMBERS.get("Room 4"), "Shared (2 people)"));
-        rooms.add(new Room("Room 5", ROOM_MEMBERS.get("Room 5"), "Shared (2 people)"));
-        return rooms;
+    // Which weekday (e.g. "Wednesday") a given room does bins on, or
+    // "Not set" if the room doesn't currently have a fixed day (only the
+    // first 7 rooms, by order, get one).
+    public String weekdayForRoom(Room room) {
+        if (room == null) {
+            return "Not set";
+        }
+        List<Room> rooms = orderedRooms(room.getHouse());
+        int rank = rooms.indexOf(room);
+        if (rank < 0 || rank >= 7) {
+            return "Not set";
+        }
+        return DayOfWeek.of(rank + 1).getDisplayName(TextStyle.FULL, Locale.ENGLISH);
     }
 
     // "single" or "shared", for compact display (e.g. "Room 4 · shared" on
-    // the housemates grid). Returns "" if the room isn't recognised.
-    public String roomTypeShort(String room) {
-        if (room == null) return "";
-        for (Room r : allRooms()) {
-            if (r.getName().equals(room)) {
-                return r.getType().startsWith("Single") ? "single" : "shared";
-            }
+    // the housemates grid). Empty string if the room is null.
+    public String roomTypeShort(Room room) {
+        if (room == null) {
+            return "";
         }
-        return "";
+        int count = room.getOccupants() == null ? 0 : room.getOccupants().size();
+        return count <= 1 ? "single" : "shared";
     }
 
     /**
-     * A small holder describing one day's washing/bins duty: the weekday name,
-     * the room on duty, and whether it is today (so the page can highlight it).
+     * A single day's bins/washing duty: the weekday name, the room on
+     * duty, and whether it's today (so the page can highlight it).
      */
     public static class DutyDay {
         private final String dayName;
-        private final String room;
-        private final String members;
+        private final Room room;
         private final boolean today;
 
-        public DutyDay(String dayName, String room, String members, boolean today) {
+        public DutyDay(String dayName, Room room, boolean today) {
             this.dayName = dayName;
             this.room = room;
-            this.members = members;
             this.today = today;
         }
+
         public String getDayName() { return dayName; }
-        public String getRoom() { return room; }
-        public String getMembers() { return members; }
+        public Room getRoom() { return room; }
         public boolean isToday() { return today; }
     }
 
     /**
-     * Returns the full fixed washing/bins schedule for the working week
-     * (Monday to Friday), each day with its room, marking which one is today.
-     * The page uses this to show the whole grid.
+     * Returns the house's full bins/washing schedule, one entry per room
+     * that has a fixed weekday (up to 7), marking which one is today.
      */
-    public List<DutyDay> weeklyDuties(LocalDate today) {
+    public List<DutyDay> weeklyDuties(House house, LocalDate today) {
+        List<Room> rooms = orderedRooms(house);
         DayOfWeek todayDow = today.getDayOfWeek();
-        // Build Monday..Friday in order.
-        DayOfWeek[] week = {
-                DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY
-        };
         List<DutyDay> duties = new ArrayList<>();
-        for (DayOfWeek d : week) {
-            String room = roomForWeekday(d);
-            String members = membersOf(room);
+        int days = Math.min(rooms.size(), 7);
+        for (int i = 0; i < days; i++) {
+            DayOfWeek d = DayOfWeek.of(i + 1);
             String name = d.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
-            duties.add(new DutyDay(name, room, members, d == todayDow));
+            duties.add(new DutyDay(name, rooms.get(i), d == todayDow));
         }
         return duties;
     }
 
-    // Helper: the room assigned to a given weekday (same fixed map as above).
-    private String roomForWeekday(DayOfWeek day) {
-        switch (day) {
-            case MONDAY:    return "Room 3";
-            case TUESDAY:   return "Room 1";
-            case WEDNESDAY: return "Room 4";
-            case THURSDAY:  return "Room 5";
-            case FRIDAY:    return "Room 2";
-            default:        return null;
-        }
-    }
-
-    // The reverse of roomForWeekday: which weekday (e.g. "Wednesday") a
-    // given room is on for washing/bins. Used on the housemates grid.
-    // Returns "Not set" if the member has no room, or "Unassigned" if
-    // somehow the room doesn't match one of the fixed five (shouldn't
-    // happen with the current fixed 5-room house).
-    public String weekdayForRoom(String room) {
-        if (room == null || room.isBlank()) return "Not set";
-        DayOfWeek[] week = {
-                DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
-                DayOfWeek.THURSDAY, DayOfWeek.FRIDAY
-        };
-        for (DayOfWeek d : week) {
-            if (room.equals(roomForWeekday(d))) {
-                return d.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
-            }
-        }
-        return "Unassigned";
-    }
-
     /**
-     * A small holder describing one week in the rota: who cleans, the Saturday
-     * their week starts, whether it is the current week, and a status label
-     * ("done" / "current" / "upcoming") for badge colouring.
+     * One week in the cleaning rota: who's on, the date their week starts,
+     * whether it's the current week, and a status label ("done" /
+     * "current" / "upcoming") for badge colouring.
      */
-    public static class RotaWeek {
-        private final String name;
+    public static class RotaEntry {
+        private final User user;
         private final LocalDate weekStart;
         private final boolean current;
         private final String status;
 
-        public RotaWeek(String name, LocalDate weekStart, boolean current) {
-            this(name, weekStart, current, current ? "current" : "upcoming");
+        public RotaEntry(User user, LocalDate weekStart, boolean current) {
+            this(user, weekStart, current, current ? "current" : "upcoming");
         }
 
-        public RotaWeek(String name, LocalDate weekStart, boolean current, String status) {
-            this.name = name;
+        public RotaEntry(User user, LocalDate weekStart, boolean current, String status) {
+            this.user = user;
             this.weekStart = weekStart;
             this.current = current;
             this.status = status;
         }
-        public String getName() { return name; }
+
+        public User getUser() { return user; }
         public LocalDate getWeekStart() { return weekStart; }
         public boolean isCurrent() { return current; }
         public String getStatus() { return status; }
     }
 
     /**
-     * Returns the rota for the current week plus the next several weeks, in
-     * order, each with the date that week begins. The first item is the current
-     * week (marked current = true).
-     *
-     * We work out the Saturday on which the current week started, then step
-     * forward one week at a time, naming whoever is on for each.
+     * Returns the rota for the current week plus the next several weeks,
+     * in order, each with the date that week begins. The first item is the
+     * current week (marked current = true).
      */
-    public List<RotaWeek> upcomingRota(LocalDate today, int howManyWeeks) {
-        long weeksSinceAnchor = ChronoUnit.WEEKS.between(ANCHOR, today);
-        // The Saturday the current rota week began.
-        LocalDate currentWeekStart = ANCHOR.plusWeeks(weeksSinceAnchor);
+    public List<RotaEntry> upcomingRota(House house, LocalDate today, int howManyWeeks) {
+        List<User> members = orderedMembers(house);
+        List<RotaEntry> rota = new ArrayList<>();
+        if (members.isEmpty()) {
+            return rota;
+        }
+        long weeksSinceAnchor = ChronoUnit.WEEKS.between(house.getCreatedDate(), today);
+        LocalDate currentWeekStart = house.getCreatedDate().plusWeeks(weeksSinceAnchor);
 
-        List<RotaWeek> rota = new ArrayList<>();
         for (int i = 0; i < howManyWeeks; i++) {
             LocalDate weekStart = currentWeekStart.plusWeeks(i);
-            String name = cleanerFor(weekStart);
-            rota.add(new RotaWeek(name, weekStart, i == 0));
+            User user = members.get(indexFor(house, weekStart, members.size()));
+            rota.add(new RotaEntry(user, weekStart, i == 0));
         }
         return rota;
     }
 
     /**
-     * Returns all 9 housemates in their fixed cleaning order, each tagged
-     * "done" (their week already passed this cycle), "current" (this week),
-     * or "upcoming" (their week is still to come this cycle), with the date
+     * Returns every current member of the house in their fixed cleaning
+     * order, each tagged "done" (their week already passed this cycle),
+     * "current" (this week), or "upcoming" (still to come), with the date
      * their week starts. Used for the full cleaning rota page.
      */
-    public List<RotaWeek> fullRotationStatus(LocalDate today) {
-        long weeksSinceAnchor = ChronoUnit.WEEKS.between(ANCHOR, today);
-        LocalDate currentWeekStart = ANCHOR.plusWeeks(weeksSinceAnchor);
-        int currentIndex = indexFor(today);
+    public List<RotaEntry> fullRotationStatus(House house, LocalDate today) {
+        List<User> members = orderedMembers(house);
+        List<RotaEntry> result = new ArrayList<>();
+        if (members.isEmpty()) {
+            return result;
+        }
+        long weeksSinceAnchor = ChronoUnit.WEEKS.between(house.getCreatedDate(), today);
+        LocalDate currentWeekStart = house.getCreatedDate().plusWeeks(weeksSinceAnchor);
+        int currentIndex = indexFor(house, today, members.size());
 
-        List<RotaWeek> result = new ArrayList<>();
-        for (int i = 0; i < CLEANING_ORDER.size(); i++) {
+        for (int i = 0; i < members.size(); i++) {
             LocalDate weekStart = currentWeekStart.plusWeeks(i - currentIndex);
             String status = i < currentIndex ? "done" : i == currentIndex ? "current" : "upcoming";
-            result.add(new RotaWeek(CLEANING_ORDER.get(i), weekStart, i == currentIndex, status));
+            result.add(new RotaEntry(members.get(i), weekStart, i == currentIndex, status));
         }
         return result;
     }
 
     /**
      * A short label for when the given housemate next cleans (or is
-     * cleaning right now), for the housemates grid: "This week",
-     * "Week of Jul 6", etc. If their week for this cycle has already
-     * passed, this looks ahead to their next turn (9 weeks later).
+     * cleaning right now): "This week", "Week of Jul 6", etc. If their
+     * week for this cycle has already passed, this looks ahead to their
+     * next turn.
      */
-    public String cleaningLabelFor(String memberName, LocalDate today) {
-        for (RotaWeek week : fullRotationStatus(today)) {
-            if (!week.getName().equals(memberName)) {
+    public String cleaningLabelFor(User member, LocalDate today) {
+        if (member.getHouse() == null) {
+            return "—";
+        }
+        List<RotaEntry> rota = fullRotationStatus(member.getHouse(), today);
+        for (RotaEntry entry : rota) {
+            if (!entry.getUser().getId().equals(member.getId())) {
                 continue;
             }
-            if (week.isCurrent()) {
+            if (entry.isCurrent()) {
                 return "This week";
             }
-            LocalDate weekStart = week.getWeekStart();
-            if ("done".equals(week.getStatus())) {
-                weekStart = weekStart.plusWeeks(CLEANING_ORDER.size());
+            LocalDate weekStart = entry.getWeekStart();
+            if ("done".equals(entry.getStatus())) {
+                weekStart = weekStart.plusWeeks(rota.size());
             }
             return "Week of " + weekStart.format(DAY_MONTH);
         }

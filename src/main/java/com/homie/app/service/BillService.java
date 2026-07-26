@@ -3,6 +3,7 @@ package com.homie.app.service;
 import com.homie.app.dto.BillCreateDto;
 import com.homie.app.entity.Bill;
 import com.homie.app.entity.BillPayment;
+import com.homie.app.entity.House;
 import com.homie.app.entity.User;
 import com.homie.app.repository.BillPaymentRepository;
 import com.homie.app.repository.BillRepository;
@@ -39,32 +40,36 @@ public class BillService {
     }
 
     /**
-     * Returns every bill, soonest due date first, for the Bills page.
+     * Returns one house's bills, soonest due date first, for that house's
+     * Bills page. Every house's bills are completely separate from every
+     * other house's.
      */
-    public List<Bill> allBills() {
-        return billRepository.findAllByOrderByDueDateAsc();
+    public List<Bill> allBills(House house) {
+        return billRepository.findByHouseOrderByDueDateAsc(house);
     }
 
     /**
      * Creates a new bill from the "Add a bill" form and splits it equally
-     * across every housemate currently registered in Homie.
+     * across every housemate currently in the creator's own house.
      */
     public void createBill(BillCreateDto dto, User creator) {
+        House house = creator.getHouse();
         Bill bill = new Bill(
                 dto.getDescription(),
                 dto.getCategory(),
                 dto.getTotalAmount(),
                 dto.getDueDate(),
                 LocalDate.now(),
-                creator
+                creator,
+                house
         );
         billRepository.save(bill);
 
-        // Give every housemate a share of this bill to pay back, including
-        // the person who created it (they paid the company, but still owe
-        // themselves a share of the total conceptually, matching a simple
-        // "split evenly among all 9" rule).
-        List<User> housemates = userRepository.findAll();
+        // Give every housemate in this house a share of this bill to pay
+        // back, including the person who created it (they paid the
+        // company, but still owe themselves a share of the total
+        // conceptually, matching a simple "split evenly" rule).
+        List<User> housemates = userRepository.findByHouse(house);
         for (User housemate : housemates) {
             BillPayment payment = new BillPayment(bill, housemate);
             billPaymentRepository.save(payment);
@@ -72,22 +77,23 @@ public class BillService {
     }
 
     /**
-     * The total still owed across every bill in the house — the sum of
+     * The total still owed across every bill in this house — the sum of
      * every housemate's unpaid shares. Shown as "Outstanding" on the
      * Bills page.
      */
-    public double outstandingTotal() {
-        return allBills().stream()
+    public double outstandingTotal(House house) {
+        return allBills(house).stream()
                 .mapToDouble(Bill::getUnpaidShareTotal)
                 .sum();
     }
 
     /**
      * How much the given housemate personally still owes, across every
-     * bill they have an unpaid share in. Shown as "Your share due".
+     * bill in their house they have an unpaid share in. Shown as
+     * "Your share due".
      */
-    public double yourShareDue(Long userId) {
-        return allBills().stream()
+    public double yourShareDue(House house, Long userId) {
+        return allBills(house).stream()
                 .map(bill -> bill.paymentFor(userId))
                 .filter(payment -> payment != null && !payment.isPaid())
                 .mapToDouble(payment -> payment.getBill().getShareAmount())
@@ -95,11 +101,11 @@ public class BillService {
     }
 
     /**
-     * How many housemates bills are currently split between. Shown as
-     * "Split between" on the Bills page.
+     * How many housemates this house's bills are currently split between.
+     * Shown as "Split between" on the Bills page.
      */
-    public long housemateCount() {
-        return userRepository.count();
+    public long housemateCount(House house) {
+        return userRepository.countByHouse(house);
     }
 
     /**

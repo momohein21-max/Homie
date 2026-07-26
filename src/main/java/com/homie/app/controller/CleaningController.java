@@ -11,11 +11,11 @@ import org.springframework.web.bind.annotation.GetMapping;
 import java.time.LocalDate;
 
 /**
- * Shows the cleaning rota page.
+ * Shows the cleaning rota page for the logged-in housemate's own house.
  *
- * The whole house is cleaned by one person per week, rotating through a fixed
- * order. This page shows who is on this week and the full 9-week cycle, each
- * housemate tagged as done, current, or upcoming for this cycle.
+ * The whole house is cleaned by one member per week, rotating through that
+ * house's own member order (see ScheduleService), looping back to the
+ * start once everyone's had a turn.
  */
 @Controller
 public class CleaningController {
@@ -31,19 +31,20 @@ public class CleaningController {
     @GetMapping("/cleaning")
     public String cleaning(Model model, Authentication authentication) {
         LocalDate today = LocalDate.now();
+        User currentUser = userService.findByEmail(authentication.getName());
+        var house = currentUser.getHouse();
 
         // Who is cleaning this week.
-        String currentCleaner = scheduleService.cleanerFor(today);
+        User currentCleaner = scheduleService.cleanerFor(house, today);
         model.addAttribute("currentCleaner", currentCleaner);
 
-        // The full 9-person cycle, each tagged done/current/upcoming.
-        model.addAttribute("rota", scheduleService.fullRotationStatus(today));
+        // The full cycle through every member of this house, each tagged
+        // done/current/upcoming.
+        model.addAttribute("rota", scheduleService.fullRotationStatus(house, today));
 
-        if (authentication != null) {
-            User currentUser = userService.findByEmail(authentication.getName());
-            model.addAttribute("currentUser", currentUser);
-            model.addAttribute("isCurrentUserCleaning", currentCleaner.equals(currentUser.getName()));
-        }
+        model.addAttribute("currentUser", currentUser);
+        model.addAttribute("isCurrentUserCleaning",
+                currentCleaner != null && currentCleaner.getId().equals(currentUser.getId()));
 
         return "cleaning"; // renders templates/cleaning.html
     }

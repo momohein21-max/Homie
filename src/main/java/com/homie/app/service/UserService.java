@@ -2,10 +2,14 @@ package com.homie.app.service;
 
 import com.homie.app.dto.ProfileUpdateDto;
 import com.homie.app.dto.RegistrationDto;
+import com.homie.app.entity.House;
+import com.homie.app.entity.Room;
 import com.homie.app.entity.User;
+import com.homie.app.repository.RoomRepository;
 import com.homie.app.repository.UserRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
@@ -36,30 +40,41 @@ public class UserService {
     private static final long RESET_TOKEN_VALID_MINUTES = 30;
 
     private final UserRepository userRepository;
+    private final RoomRepository roomRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final HouseService houseService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                        EmailService emailService) {
+    public UserService(UserRepository userRepository, RoomRepository roomRepository,
+                        PasswordEncoder passwordEncoder, EmailService emailService,
+                        HouseService houseService) {
         this.userRepository = userRepository;
+        this.roomRepository = roomRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.houseService = houseService;
     }
 
     /**
-     * Creates and saves a new user from the registration form.
-     * Returns false if the email is already in use, true if registration worked.
+     * Creates and saves a new user from the registration form, then either
+     * starts a brand new house for them or adds them to an existing one,
+     * depending on which action they picked (see RegistrationDto).
+     *
+     * Returns an error message if something went wrong (email already
+     * taken, missing house details, or an invite code that doesn't match
+     * any house), or null if registration succeeded.
      */
-    public boolean register(RegistrationDto dto) {
+    public String register(RegistrationDto dto) {
         // Do not allow two accounts with the same email.
         if (userRepository.existsByEmailIgnoreCase(dto.getEmail())) {
-            return false;
+            return "That email is already registered.";
         }
 
         // Turn the plain-text password into a secure BCrypt hash before saving.
         String hashedPassword = passwordEncoder.encode(dto.getPassword());
 
-        // Every new housemate starts as a normal user.
+        // Every new housemate starts as a normal user. House/room are set
+        // by HouseService below, once we know which path they're taking.
         User user = new User(
                 dto.getName(),
                 dto.getEmail(),
@@ -67,14 +82,22 @@ public class UserService {
                 "ROLE_USER"
         );
 
-        // The room picker on the register page is optional — a housemate
-        // can always set or change it later on their profile.
-        if (dto.getRoom() != null && !dto.getRoom().isBlank()) {
-            user.setRoom(dto.getRoom());
+        if ("JOIN".equalsIgnoreCase(dto.getAction())) {
+            return houseService.joinHouse(dto.getInviteCode(), user);
         }
 
-        userRepository.save(user);
-        return true;
+        // Anything other than "JOIN" is treated as "CREATE" - the default
+        // and the only other real option the form offers.
+        if (dto.getHouseName() == null || dto.getHouseName().isBlank()) {
+            return "Please enter a name for your house.";
+        }
+        int roomCount = dto.getRoomCount() != null ? dto.getRoomCount() : HouseService.MIN_ROOMS;
+        if (roomCount < HouseService.MIN_ROOMS || roomCount > HouseService.MAX_ROOMS) {
+            return "Please choose between " + HouseService.MIN_ROOMS
+                    + " and " + HouseService.MAX_ROOMS + " rooms.";
+        }
+        houseService.createHouse(dto.getHouseName(), roomCount, user);
+        return null;
     }
 
     /**
@@ -97,11 +120,15 @@ public class UserService {
     }
 
     /**
-     * Returns every housemate, sorted alphabetically by name, for the
-     * dashboard's "House & responsibilities" panel.
+     * Returns every housemate IN THE GIVEN HOUSE, sorted alphabetically by
+     * name, for the Housemates grid. Deliberately scoped to one house
+     * (rather than the old "every user in the whole app") - with any
+     * number of independent houses now sharing Homie, showing every
+     * registered user everywhere would leak one house's housemates to
+     * every other house.
      */
-    public List<User> findAllSortedByName() {
-        return userRepository.findAll().stream()
+    public List<User> findAllInHouseSortedByName(House house) {
+        return userRepository.findByHouse(house).stream()
                 .sorted((a, b) -> a.getName().compareToIgnoreCase(b.getName()))
                 .toList();
     }
@@ -150,9 +177,23 @@ public class UserService {
             }
         }
 
+        // The room dropdown submits a room id (or blank for "Not set"). Only
+        // accept a room that actually belongs to this housemate's own
+        // house - otherwise someone could edit the form to move into a
+        // room in a different house entirely.
+        if (dto.getRoomId() == null) {
+            user.setRoom(null);
+        } else {
+            Room room = roomRepository.findById(dto.getRoomId()).orElse(null);
+            if (room == null || room.getHouse() == null
+                    || !room.getHouse().getId().equals(user.getHouse().getId())) {
+                return "Please choose a room from your own house.";
+            }
+            user.setRoom(room);
+        }
+
         user.setName(dto.getName());
         user.setEmail(dto.getEmail());
-        user.setRoom(dto.getRoom());
         user.setDuty(dto.getDuty());
         user.setPaymentDetails(dto.getPaymentDetails());
         userRepository.save(user);
@@ -161,11 +202,71 @@ public class UserService {
     }
 
     /**
-     * Permanently deletes the logged-in user's account.
+     * Checks whether this housemate's account can safely be deleted right
+     * now. Returns an error message if not, or null if it's fine to go
+     * ahead and call deleteAccount().
+     *
+     * The one case this blocks: a house's owner (its creator) can't be
+     * deleted while other housemates still live there, since
+     * House.createdBy can never be null - there would be nobody left to
+     * "own" the house. If the owner is the LAST person in the house,
+     * deleting them is fine (deleteAccount() removes the now-empty house
+     * too). Must be checked before any destructive cleanup runs (bills,
+     * announcements, the account itself) - see ProfileController, which
+     * calls this first and only proceeds if it returns null.
      */
+    public String checkAccountDeletable(String email) {
+        User user = findByEmail(email);
+        if (user.isHouseOwner()) {
+            long memberCount = userRepository.countByHouse(user.getHouse());
+            if (memberCount > 1) {
+                return "You created " + user.getHouse().getName() + " and other housemates are still using it. "
+                        + "Everyone else will need to leave (or you'll need to hand off ownership some other way) "
+                        + "before your account can be deleted.";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Permanently deletes the logged-in user's account. If they were the
+     * sole member and owner of their house, the now-empty house (and its
+     * rooms) is deleted right along with them - there'd be nobody left to
+     * use it anyway. Callers should check checkAccountDeletable() first;
+     * this method doesn't re-check, since by the time it's called the
+     * caller has usually already deleted the user's bills/announcements,
+     * which can't easily be undone if this method then refused to finish.
+     *
+     * Every write here goes through a plain SQL / native-query repository
+     * method rather than Hibernate's normal entity save()/delete(). That's
+     * deliberate: House and User point at each other (House.createdBy is a
+     * required, non-nullable link back to the very user being deleted
+     * here), and asking Hibernate to manage that deletion through its
+     * usual entity graph repeatedly trips over its own bookkeeping for
+     * that relationship - either trying to null out a required column
+     * before a delete, or refusing to flush because it thinks a still-
+     * referenced entity looks "unsaved". Plain SQL has none of that
+     * bookkeeping, so it just does the deletes in the one order that's
+     * actually valid for the foreign keys involved:
+     *   1. detach this user from their house/room (so nothing still
+     *      points at the house once it's gone)
+     *   2. delete the house's rooms, then the house itself (only reached
+     *      if this user was its owner and its last remaining member)
+     *   3. delete the user
+     */
+    @Transactional
     public void deleteAccount(String email) {
         User user = findByEmail(email);
-        userRepository.delete(user);
+        House house = user.getHouse();
+        boolean wasOwner = user.isHouseOwner();
+        Long userId = user.getId();
+
+        if (wasOwner && house != null) {
+            userRepository.detachFromHouseAndRoomNative(userId);
+            houseService.deleteHouse(house);
+        }
+
+        userRepository.deleteByIdNative(userId);
     }
 
     /**

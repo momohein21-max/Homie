@@ -132,15 +132,19 @@
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5v3a1 1 0 0 0 1 1h2.5l7 4V5.5l-7 4H5a1 1 0 0 0-1 1ZM18 10a3 3 0 0 1 0 4"></path></svg>
                 <span>Announcements</span>
             </a>
+            <a th:href="@{/house}" class="nav-item">
+                <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" stroke-linejoin="round"></path><path d="M9.5 20v-6h5v6"></path></svg>
+                <span>Manage house</span>
+            </a>
         </nav>
         <div class="sidebar-footer">
             <a th:href="@{/profile}" class="sidebar-footer-link" title="My profile">
                 <div class="avatar avatar-38" th:if="${currentUser}"
-                     th:style="${@avatarService.pictureUrl(currentUser.name) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser.name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser.name))}"
-                     th:text="${@avatarService.pictureUrl(currentUser.name) != null ? '' : @avatarService.initials(currentUser.name)}">Mo</div>
+                     th:style="${@avatarService.pictureUrl(currentUser) != null ? ('background-image:url(' + @avatarService.pictureUrl(currentUser) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(currentUser))}"
+                     th:text="${@avatarService.pictureUrl(currentUser) != null ? '' : @avatarService.initials(currentUser)}">Mo</div>
                 <div style="flex:1;min-width:0;">
                     <div class="who-name" th:text="${currentUser != null ? currentUser.name : 'You'}">Momo</div>
-                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room : 'No room set'}">Room 4</div>
+                    <div class="who-room" th:text="${currentUser != null and currentUser.room != null ? currentUser.room.name : 'No room set'}">Room 4</div>
                 </div>
             </a>
             <form th:action="@{/logout}" method="post" class="m-0">
@@ -167,12 +171,15 @@
             <div class="bins-grid">
                 <div th:each="duty : ${duties}" th:class="${duty.today} ? 'bin-card today' : 'bin-card plain'">
                     <div class="bin-day" th:text="${#strings.substring(duty.dayName, 0, 3)}">Mon</div>
-                    <div class="bin-room" th:text="${duty.room}">Room 3</div>
+                    <div class="bin-room" th:text="${duty.room.name}">Room 3</div>
                     <div>
-                        <div class="bin-member" th:each="name : ${#strings.arraySplit(duty.members, ' &amp; ')}">
-                            <div class="avatar avatar-30" th:style="${@avatarService.pictureUrl(name) != null ? ('background-image:url(' + @avatarService.pictureUrl(name) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(name))}"
-                                 th:text="${@avatarService.pictureUrl(name) != null ? '' : @avatarService.initials(name)}">Ju</div>
-                            <span th:text="${name}">Julia</span>
+                        <div th:if="${#lists.isEmpty(duty.room.occupants)}" class="bin-member">
+                            <span style="color:var(--muted);">Empty room</span>
+                        </div>
+                        <div class="bin-member" th:each="occupant : ${duty.room.occupants}">
+                            <div class="avatar avatar-30" th:style="${@avatarService.pictureUrl(occupant) != null ? ('background-image:url(' + @avatarService.pictureUrl(occupant) + ');background-size:cover;background-position:center;') : ('background:' + @avatarService.color(occupant))}"
+                                 th:text="${@avatarService.pictureUrl(occupant) != null ? '' : @avatarService.initials(occupant)}">Ju</div>
+                            <span th:text="${occupant.name}">Julia</span>
                         </div>
                     </div>
                     <div th:if="${duty.today}" class="today-tag">● Today</div>
@@ -184,9 +191,9 @@
                 <div th:each="room : ${rooms}" class="room-row">
                     <span>
                         <span class="rname" th:text="${room.name}">Room 1</span>
-                        <div class="rmembers" th:text="${room.members}">Edgar</div>
+                        <div class="rmembers" th:text="${room.occupantNames}">Edgar</div>
                     </span>
-                    <span class="rtype" th:text="${room.type}">Single (1 person)</span>
+                    <span class="rtype" th:text="${room.typeLabel}">Single (1 person)</span>
                 </div>
             </div>
 

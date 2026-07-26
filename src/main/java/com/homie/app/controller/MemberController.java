@@ -13,7 +13,8 @@ import java.util.Optional;
 
 /**
  * Handles read-only viewing of housemates: the "Housemates" grid showing
- * everyone at a glance, and clicking through to one person's own page.
+ * everyone in the logged-in user's own house at a glance, and clicking
+ * through to one person's own page.
  *
  * This is deliberately separate from ProfileController, which only ever
  * edits the CURRENTLY LOGGED-IN user's own account. Nothing in this
@@ -33,35 +34,32 @@ public class MemberController {
         this.userService = userService;
     }
 
-    // The "Housemates" grid: everyone in the house, with their room, bins
-    // day, and next cleaning week at a glance.
+    // The "Housemates" grid: everyone in the logged-in user's house, with
+    // their room, bins day, and next cleaning week at a glance.
     @GetMapping("/members")
     public String members(Model model, Authentication authentication) {
-        model.addAttribute("members", userService.findAllSortedByName());
+        User currentUser = userService.findByEmail(authentication.getName());
+        model.addAttribute("members", userService.findAllInHouseSortedByName(currentUser.getHouse()));
         model.addAttribute("today", LocalDate.now());
-        addCurrentUser(model, authentication);
+        model.addAttribute("currentUser", currentUser);
         return "members"; // renders templates/members.html
     }
 
     @GetMapping("/members/{id}")
     public String viewMember(@PathVariable Long id, Model model, Authentication authentication) {
+        User currentUser = userService.findByEmail(authentication.getName());
         Optional<User> member = userService.findById(id);
 
-        if (member.isEmpty()) {
-            // No such housemate (e.g. their account was since deleted).
+        // No such housemate, or they belong to a different house entirely
+        // (don't let someone view another house's member by guessing an id).
+        if (member.isEmpty() || member.get().getHouse() == null || currentUser.getHouse() == null
+                || !member.get().getHouse().getId().equals(currentUser.getHouse().getId())) {
             return "redirect:/members";
         }
 
         model.addAttribute("member", member.get());
         model.addAttribute("today", LocalDate.now());
-        addCurrentUser(model, authentication);
+        model.addAttribute("currentUser", currentUser);
         return "member"; // renders templates/member.html
-    }
-
-    // Shared: the logged-in user, for the sidebar footer (avatar/name/room).
-    private void addCurrentUser(Model model, Authentication authentication) {
-        if (authentication != null) {
-            model.addAttribute("currentUser", userService.findByEmail(authentication.getName()));
-        }
     }
 }

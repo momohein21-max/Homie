@@ -1,6 +1,7 @@
 package com.homie.app.repository;
 
 import com.homie.app.entity.Bill;
+import com.homie.app.entity.House;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -10,7 +11,9 @@ import java.util.List;
  */
 public interface BillRepository extends JpaRepository<Bill, Long> {
 
-    // All bills, soonest due date first. Used to list bills on the
-    // Bills page with the most urgent ones at the top.
-    List<Bill> findAllByOrderByDueDateAsc();
+    // One house's bills, soonest due date first. Used to list bills on the
+    // Bills page with the most urgent ones at the top - scoped to a single
+    // house, since every house's bills are entirely separate from every
+    // other house's.
+    List<Bill> findByHouseOrderByDueDateAsc(House house);
 }

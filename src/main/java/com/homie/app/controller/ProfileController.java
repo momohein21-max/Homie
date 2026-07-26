@@ -4,6 +4,7 @@ import com.homie.app.dto.ProfileUpdateDto;
 import com.homie.app.entity.User;
 import com.homie.app.service.AnnouncementService;
 import com.homie.app.service.BillService;
+import com.homie.app.service.ScheduleService;
 import com.homie.app.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -42,12 +43,14 @@ public class ProfileController {
     private final UserService userService;
     private final BillService billService;
     private final AnnouncementService announcementService;
+    private final ScheduleService scheduleService;
 
     public ProfileController(UserService userService, BillService billService,
-                              AnnouncementService announcementService) {
+                              AnnouncementService announcementService, ScheduleService scheduleService) {
         this.userService = userService;
         this.billService = billService;
         this.announcementService = announcementService;
+        this.scheduleService = scheduleService;
     }
 
     // Show the profile page, pre-filled with the logged-in user's details.
@@ -58,12 +61,16 @@ public class ProfileController {
         ProfileUpdateDto dto = new ProfileUpdateDto();
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());
-        dto.setRoom(user.getRoom());
+        dto.setRoomId(user.getRoom() != null ? user.getRoom().getId() : null);
         dto.setDuty(user.getDuty());
         dto.setPaymentDetails(user.getPaymentDetails());
 
         model.addAttribute("profile", dto);
         model.addAttribute("hasProfilePicture", user.getProfilePicture() != null);
+        // This house's actual rooms, for the room dropdown - replaces the
+        // old hardcoded "Room 1".."Room 5" list.
+        model.addAttribute("houseRooms", scheduleService.orderedRooms(user.getHouse()));
+        model.addAttribute("currentUser", user);
         return "profile"; // renders templates/profile.html
     }
 
@@ -80,8 +87,10 @@ public class ProfileController {
 
         // If any validation rule failed (e.g. blank name), show the form again.
         if (result.hasErrors()) {
-            model.addAttribute("hasProfilePicture",
-                    userService.findByEmail(authentication.getName()).getProfilePicture() != null);
+            User currentUser = userService.findByEmail(authentication.getName());
+            model.addAttribute("hasProfilePicture", currentUser.getProfilePicture() != null);
+            model.addAttribute("houseRooms", scheduleService.orderedRooms(currentUser.getHouse()));
+            model.addAttribute("currentUser", currentUser);
             return "profile";
         }
 
@@ -89,9 +98,11 @@ public class ProfileController {
         String error = userService.updateProfile(currentEmail, dto, profilePicture);
 
         if (error != null) {
+            User currentUser = userService.findByEmail(currentEmail);
             model.addAttribute("profileError", error);
-            model.addAttribute("hasProfilePicture",
-                    userService.findByEmail(currentEmail).getProfilePicture() != null);
+            model.addAttribute("hasProfilePicture", currentUser.getProfilePicture() != null);
+            model.addAttribute("houseRooms", scheduleService.orderedRooms(currentUser.getHouse()));
+            model.addAttribute("currentUser", currentUser);
             return "profile";
         }
 
@@ -106,9 +117,11 @@ public class ProfileController {
             return "redirect:/login?emailChanged";
         }
 
+        User updatedUser = userService.findByEmail(currentEmail);
         model.addAttribute("profileSuccess", "Your profile has been updated.");
-        model.addAttribute("hasProfilePicture",
-                userService.findByEmail(currentEmail).getProfilePicture() != null);
+        model.addAttribute("hasProfilePicture", updatedUser.getProfilePicture() != null);
+        model.addAttribute("houseRooms", scheduleService.orderedRooms(updatedUser.getHouse()));
+        model.addAttribute("currentUser", updatedUser);
         dto.setNewPassword(""); // don't echo the password back into the field
         return "profile";
     }
@@ -132,15 +145,18 @@ public class ProfileController {
         return pictureResponseFor(user);
     }
 
-    // Serve ANY housemate's profile picture by id. Used for avatars on the
-    // dashboard's "House & responsibilities" panel and the member detail
-    // page. Safe to expose to any logged-in housemate — this is a shared
-    // house app, not a public one (SecurityConfig already requires login
-    // for every route except /login and /register).
+    // Serve a housemate's profile picture by id. Used for avatars on the
+    // dashboard, cleaning rota, bins page, housemates grid, bills, and
+    // announcements. Only shown to a housemate in the SAME HOUSE as the
+    // picture's owner - with any number of independent houses now sharing
+    // Homie, this stops one house's members from being able to view
+    // another house's profile pictures just by guessing user ids in the URL.
     @GetMapping("/profile/picture/{id}")
-    public ResponseEntity<byte[]> profilePictureById(@PathVariable Long id) {
+    public ResponseEntity<byte[]> profilePictureById(@PathVariable Long id, Authentication authentication) {
+        User requester = userService.findByEmail(authentication.getName());
         Optional<User> user = userService.findById(id);
-        if (user.isEmpty()) {
+        if (user.isEmpty() || user.get().getHouse() == null || requester.getHouse() == null
+                || !user.get().getHouse().getId().equals(requester.getHouse().getId())) {
             return ResponseEntity.notFound().build();
         }
         return pictureResponseFor(user.get());
@@ -165,8 +181,22 @@ public class ProfileController {
     // log them out. Skipping the cleanup step would make the database
     // reject the deletion outright, since bills, bill payments, and
     // announcements are all required to point at a real housemate.
+    //
+    // Checked BEFORE any of that cleanup runs: is this account even safe
+    // to delete? A house's owner can't be removed while other housemates
+    // still live there (see UserService.checkAccountDeletable) - catching
+    // that first avoids deleting someone's bills and announcements only
+    // to then fail on the account itself, which would leave things in a
+    // half-deleted state with no way back.
     @PostMapping("/profile/delete")
-    public String deleteProfile(Authentication authentication, HttpServletRequest request) {
+    public String deleteProfile(Authentication authentication, HttpServletRequest request,
+                                 RedirectAttributes redirectAttributes) {
+        String blockedReason = userService.checkAccountDeletable(authentication.getName());
+        if (blockedReason != null) {
+            redirectAttributes.addFlashAttribute("profileError", blockedReason);
+            return "redirect:/profile";
+        }
+
         User user = userService.findByEmail(authentication.getName());
 
         billService.deleteAllForUser(user.getId());

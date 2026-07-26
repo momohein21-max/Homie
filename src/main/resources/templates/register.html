@@ -83,6 +83,13 @@
                          font-size: 14px; margin: 0 0 18px; }
         .field-error { color: var(--terra); font-size: 12.5px; margin: 4px 0 0; }
 
+        .action-toggle { display: flex; gap: 8px; background: var(--bg); border-radius: 12px; padding: 4px; }
+        .action-toggle label { flex: 1; text-align: center; padding: 9px 10px; border-radius: 9px; font-size: 13.5px;
+                                font-weight: 600; color: var(--muted); cursor: pointer; }
+        .action-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+        .action-toggle label.checked { background: var(--card); color: var(--green-deep); box-shadow: 0 1px 2px rgba(60,50,30,.08); }
+        .helper-text { font-size: 12.5px; color: var(--muted); margin: -10px 0 16px; }
+
         @media (max-width: 760px) {
             .brand-panel { display: none; }
             .card { min-height: 0; }
@@ -106,43 +113,61 @@
                 <p>Cleaning weeks, bins, bills and house notices — all in one warm little place for everyone under this roof.</p>
             </div>
             <div class="brand-stats">
-                <div><div class="num">9</div>housemates</div>
-                <div><div class="num">5</div>rooms</div>
-                <div><div class="num">1</div>home</div>
+                <div><div class="num">∞</div>houses</div>
+                <div><div class="num">1-20</div>rooms each</div>
+                <div><div class="num">Free</div>to join</div>
             </div>
         </div>
 
         <!-- Form panel -->
         <div class="form-panel">
-            <h2>Join the house</h2>
-            <p class="lead">Create your account to get settled in.</p>
+            <h2>Join Homie</h2>
+            <p class="lead">Start your own house, or join one your housemates already set up.</p>
 
-            <div th:if="${emailError}" class="alert-danger" th:text="${emailError}"></div>
+            <div th:if="${registerError}" class="alert-danger" th:text="${registerError}"></div>
 
             <form th:action="@{/register}" th:object="${user}" method="post">
+                <div class="mb16">
+                    <label class="field-label">I want to...</label>
+                    <div class="action-toggle">
+                        <label id="labelCreate">
+                            <input type="radio" name="action" value="CREATE" th:field="*{action}" onclick="__toggleAction()"> Start a new house
+                        </label>
+                        <label id="labelJoin">
+                            <input type="radio" name="action" value="JOIN" th:field="*{action}" onclick="__toggleAction()"> Join my house
+                        </label>
+                    </div>
+                </div>
+
                 <div class="mb16">
                     <label class="field-label" for="name">Full name</label>
                     <input type="text" id="name" th:field="*{name}" class="field" placeholder="e.g. Momo">
                     <div class="field-error" th:if="${#fields.hasErrors('name')}" th:errors="*{name}"></div>
                 </div>
 
-                <div class="field-row">
+                <div class="mb16">
+                    <label class="field-label" for="email">Email</label>
+                    <input type="email" id="email" th:field="*{email}" class="field" placeholder="you@homie.house">
+                    <div class="field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
+                </div>
+
+                <!-- Create-a-house panel -->
+                <div id="createPanel" class="field-row">
                     <div class="grow-1">
-                        <label class="field-label" for="email">Email</label>
-                        <input type="email" id="email" th:field="*{email}" class="field" placeholder="you@homie.house">
-                        <div class="field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></div>
+                        <label class="field-label" for="houseName">House name</label>
+                        <input type="text" id="houseName" th:field="*{houseName}" class="field" placeholder="e.g. 14 Elm Street">
                     </div>
                     <div class="grow-2">
-                        <label class="field-label" for="room">Room</label>
-                        <select id="room" class="field" th:field="*{room}">
-                            <option value="">Not set</option>
-                            <option value="Room 1">Room 1</option>
-                            <option value="Room 2">Room 2</option>
-                            <option value="Room 3">Room 3</option>
-                            <option value="Room 4">Room 4</option>
-                            <option value="Room 5">Room 5</option>
-                        </select>
+                        <label class="field-label" for="roomCount">Rooms</label>
+                        <input type="number" id="roomCount" th:field="*{roomCount}" class="field" min="1" max="20" placeholder="5">
                     </div>
+                </div>
+
+                <!-- Join-a-house panel -->
+                <div id="joinPanel" class="mb16">
+                    <label class="field-label" for="inviteCode">House invite code</label>
+                    <input type="text" id="inviteCode" th:field="*{inviteCode}" class="field" placeholder="e.g. AB3X9K" style="text-transform:uppercase;">
+                    <p class="helper-text">Ask whoever set up your house for this - it's on their "Manage house" page.</p>
                 </div>
 
                 <div class="mb22">
@@ -159,5 +184,15 @@
 
     </div>
 </div>
+<script>
+function __toggleAction() {
+    var isCreate = document.querySelector('input[name="action"][value="CREATE"]').checked;
+    document.getElementById('createPanel').style.display = isCreate ? 'flex' : 'none';
+    document.getElementById('joinPanel').style.display = isCreate ? 'none' : 'block';
+    document.getElementById('labelCreate').classList.toggle('checked', isCreate);
+    document.getElementById('labelJoin').classList.toggle('checked', !isCreate);
+}
+__toggleAction();
+</script>
 </body>
 </html>

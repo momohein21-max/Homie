@@ -118,15 +118,16 @@ public class BillController {
     }
 
     // Shared between the GET page load and the "add bill" error path, so
-    // both render the exact same stat cards and bill list.
+    // both render the exact same stat cards and bill list - all scoped to
+    // the logged-in housemate's own house.
     private void addCommonAttributes(Model model, User currentUser) {
-        model.addAttribute("bills", billService.allBills());
+        model.addAttribute("bills", billService.allBills(currentUser.getHouse()));
         model.addAttribute("categories", CATEGORIES);
         model.addAttribute("currentUser", currentUser);
         model.addAttribute("currentUserId", currentUser.getId());
-        model.addAttribute("outstandingTotal", billService.outstandingTotal());
-        model.addAttribute("yourShareDue", billService.yourShareDue(currentUser.getId()));
-        model.addAttribute("housemateCount", billService.housemateCount());
+        model.addAttribute("outstandingTotal", billService.outstandingTotal(currentUser.getHouse()));
+        model.addAttribute("yourShareDue", billService.yourShareDue(currentUser.getHouse(), currentUser.getId()));
+        model.addAttribute("housemateCount", billService.housemateCount(currentUser.getHouse()));
         model.addAttribute("todayDisplay",
                 LocalDate.now().format(DateTimeFormatter.ofPattern("EEEE, MMM d", Locale.ENGLISH)));
     }

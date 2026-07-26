@@ -1,11 +1,7 @@
 package com.homie.app.service;
 
 import com.homie.app.entity.User;
-import com.homie.app.repository.UserRepository;
 import org.springframework.stereotype.Service;
-
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Gives every housemate a consistent avatar colour and initials, used
@@ -15,83 +11,56 @@ import java.util.Optional;
  * instead of the coloured initials.
  *
  * Registered as a normal Spring bean so Thymeleaf templates can call it
- * directly as "@avatarService.color(name)" / "@avatarService.initials(name)"
- * / "@avatarService.pictureUrl(name)" without every controller having to
- * pass avatar data through the model.
+ * directly as "@avatarService.color(user)" / "@avatarService.initials(user)"
+ * / "@avatarService.pictureUrl(user)" without every controller having to
+ * pass avatar data through the model separately.
  *
- * The 9 fixed housemates get hand-picked colours matching the house's
- * design reference. Anyone else (e.g. a housemate added later, or a typo
- * in a name) still gets a stable colour, just picked deterministically
- * from the same palette instead of a hand-picked one.
+ * IMPORTANT: this used to look housemates up BY NAME, which worked when
+ * Homie only served one fixed 9-person house where every name was unique.
+ * Now that any number of independent houses share the same app, two
+ * different houses can easily both have a "John" - a name lookup would
+ * have shown one house's John a different house's John's profile picture.
+ * Every method here now takes the actual User object instead, which also
+ * means no database lookup is needed at all: the colour is derived from
+ * the user's own id, and the picture comes straight off the object.
  */
 @Service
 public class AvatarService {
 
-    private static final Map<String, String> NAMED_COLORS = Map.ofEntries(
-            Map.entry("Julia", "#6B8E5A"),
-            Map.entry("Edgar", "#C39A4E"),
-            Map.entry("Momo", "#B5654A"),
-            Map.entry("Sheron", "#6E8A8E"),
-            Map.entry("Luis", "#8A8B4B"),
-            Map.entry("Lívia", "#A8755A"),
-            Map.entry("Ágatha", "#8A6A7A"),
-            Map.entry("Allyne", "#5E7D52"),
-            Map.entry("Edecilmar", "#9C7A4E")
-    );
-
-    // Same palette, used as a fallback so any other name still gets one of
-    // these colours rather than a random one.
-    private static final String[] FALLBACK_PALETTE = {
+    // A small warm palette matching the house's design reference. Every
+    // housemate gets a colour from here, picked deterministically from
+    // their user id so the same person always gets the same colour.
+    private static final String[] PALETTE = {
             "#6B8E5A", "#C39A4E", "#B5654A", "#6E8A8E", "#8A8B4B",
             "#A8755A", "#8A6A7A", "#5E7D52", "#9C7A4E"
     };
 
-    private final UserRepository userRepository;
-
-    public AvatarService(UserRepository userRepository) {
-        this.userRepository = userRepository;
+    public String color(User user) {
+        if (user == null || user.getId() == null) {
+            return PALETTE[0];
+        }
+        int index = Math.floorMod(user.getId().hashCode(), PALETTE.length);
+        return PALETTE[index];
     }
 
-    public String color(String name) {
-        if (name == null || name.isBlank()) {
-            return FALLBACK_PALETTE[0];
-        }
-        String trimmed = name.trim();
-        String known = NAMED_COLORS.get(trimmed);
-        if (known != null) {
-            return known;
-        }
-        int index = Math.floorMod(trimmed.hashCode(), FALLBACK_PALETTE.length);
-        return FALLBACK_PALETTE[index];
-    }
-
-    public String initials(String name) {
-        if (name == null || name.isBlank()) {
+    public String initials(User user) {
+        if (user == null || user.getName() == null || user.getName().isBlank()) {
             return "?";
         }
-        String trimmed = name.trim();
+        String trimmed = user.getName().trim();
         return trimmed.length() >= 2 ? trimmed.substring(0, 2) : trimmed.substring(0, 1);
     }
 
     /**
-     * If the housemate with this name has uploaded a real profile
-     * picture, returns the URL to show it (e.g. "/profile/picture/7").
-     * Returns null if they haven't set one, or no housemate matches the
-     * name — in which case the template should fall back to the coloured
-     * initials circle instead.
-     *
-     * Name-based (not id-based) so this works everywhere an avatar is
-     * already shown by name alone, like the cleaning rota, without having
-     * to thread a full User object through every page.
+     * If this housemate has uploaded a real profile picture, returns the
+     * URL to show it (e.g. "/profile/picture/7"). Returns null if they
+     * haven't set one, in which case the template should fall back to the
+     * coloured initials circle instead.
      */
-    public String pictureUrl(String name) {
-        if (name == null || name.isBlank()) {
+    public String pictureUrl(User user) {
+        if (user == null || user.getProfilePicture() == null) {
             return null;
         }
-        Optional<User> user = userRepository.findByNameIgnoreCase(name.trim());
-        if (user.isEmpty() || user.get().getProfilePicture() == null) {
-            return null;
-        }
-        return "/profile/picture/" + user.get().getId();
+        return "/profile/picture/" + user.getId();
     }
 }

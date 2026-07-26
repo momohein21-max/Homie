@@ -1,6 +1,7 @@
 package com.homie.app.controller;
 
 import com.homie.app.dto.AnnouncementCreateDto;
+import com.homie.app.entity.Announcement;
 import com.homie.app.entity.User;
 import com.homie.app.service.AnnouncementService;
 import com.homie.app.service.UserService;
@@ -18,8 +19,9 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import java.util.List;
 
 /**
- * Handles the Announcements board: viewing all house notices, reading one
- * in full, posting a new one, and deleting one you posted.
+ * Handles the Announcements board: viewing all notices posted in the
+ * logged-in housemate's own house, reading one in full, posting a new one,
+ * and deleting one you posted.
  */
 @Controller
 public class AnnouncementController {
@@ -41,7 +43,7 @@ public class AnnouncementController {
     public String announcements(Model model, Authentication authentication) {
         User currentUser = userService.findByEmail(authentication.getName());
 
-        model.addAttribute("announcements", announcementService.allAnnouncements());
+        model.addAttribute("announcements", announcementService.allAnnouncements(currentUser.getHouse()));
         model.addAttribute("categories", CATEGORIES);
         model.addAttribute("currentUser", currentUser);
         model.addAttribute("currentUserId", currentUser.getId());
@@ -56,8 +58,16 @@ public class AnnouncementController {
     @GetMapping("/announcements/{id}")
     public String viewAnnouncement(@PathVariable Long id, Model model, Authentication authentication) {
         User currentUser = userService.findByEmail(authentication.getName());
+        Announcement announcement = announcementService.findById(id);
 
-        model.addAttribute("announcement", announcementService.findById(id));
+        // Don't let a housemate view another house's notice just by
+        // guessing its id in the URL.
+        if (announcement.getHouse() == null || currentUser.getHouse() == null
+                || !announcement.getHouse().getId().equals(currentUser.getHouse().getId())) {
+            return "redirect:/announcements";
+        }
+
+        model.addAttribute("announcement", announcement);
         model.addAttribute("currentUser", currentUser);
         model.addAttribute("currentUserId", currentUser.getId());
 
@@ -73,7 +83,7 @@ public class AnnouncementController {
         User currentUser = userService.findByEmail(authentication.getName());
 
         if (result.hasErrors()) {
-            model.addAttribute("announcements", announcementService.allAnnouncements());
+            model.addAttribute("announcements", announcementService.allAnnouncements(currentUser.getHouse()));
             model.addAttribute("categories", CATEGORIES);
             model.addAttribute("currentUser", currentUser);
             model.addAttribute("currentUserId", currentUser.getId());

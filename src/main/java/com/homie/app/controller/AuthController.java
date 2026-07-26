@@ -50,10 +50,12 @@ public class AuthController {
             return "register";
         }
 
-        // Try to register. If the email is taken, show a friendly message.
-        boolean success = userService.register(dto);
-        if (!success) {
-            model.addAttribute("emailError", "That email is already registered.");
+        // Try to register - this also creates or joins a house, depending
+        // on which action was picked. Shows whatever error came back
+        // (taken email, missing house name, bad invite code, ...).
+        String error = userService.register(dto);
+        if (error != null) {
+            model.addAttribute("registerError", error);
             return "register";
         }
 

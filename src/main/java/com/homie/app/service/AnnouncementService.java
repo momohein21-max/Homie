@@ -2,6 +2,7 @@ package com.homie.app.service;
 
 import com.homie.app.dto.AnnouncementCreateDto;
 import com.homie.app.entity.Announcement;
+import com.homie.app.entity.House;
 import com.homie.app.entity.User;
 import com.homie.app.repository.AnnouncementRepository;
 import org.springframework.stereotype.Service;
@@ -12,7 +13,8 @@ import java.util.List;
 
 /**
  * Holds the business logic for the Announcements board. Any housemate can
- * post a notice; only the housemate who posted it can delete it.
+ * post a notice for their own house; only the housemate who posted it can
+ * delete it.
  */
 @Service
 public class AnnouncementService {
@@ -23,15 +25,15 @@ public class AnnouncementService {
         this.announcementRepository = announcementRepository;
     }
 
-    // All notices, newest first, for the full Announcements board.
-    public List<Announcement> allAnnouncements() {
-        return announcementRepository.findAllByOrderByCreatedDateDesc();
+    // One house's notices, newest first, for that house's Announcements board.
+    public List<Announcement> allAnnouncements(House house) {
+        return announcementRepository.findByHouseOrderByCreatedDateDesc(house);
     }
 
-    // The most recent few notices, for the dashboard's "Recent
-    // announcements" panel.
-    public List<Announcement> recentAnnouncements(int howMany) {
-        List<Announcement> all = allAnnouncements();
+    // The most recent few notices in one house, for that house's dashboard
+    // "Recent announcements" panel.
+    public List<Announcement> recentAnnouncements(House house, int howMany) {
+        List<Announcement> all = allAnnouncements(house);
         return all.subList(0, Math.min(howMany, all.size()));
     }
 
@@ -46,7 +48,8 @@ public class AnnouncementService {
                 dto.getCategory(),
                 dto.getBody(),
                 LocalDate.now(),
-                author
+                author,
+                author.getHouse()
         );
         announcementRepository.save(announcement);
     }

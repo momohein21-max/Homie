@@ -1,6 +1,7 @@
 package com.homie.app.repository;
 
 import com.homie.app.entity.Announcement;
+import com.homie.app.entity.House;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -10,6 +11,7 @@ import java.util.List;
  */
 public interface AnnouncementRepository extends JpaRepository<Announcement, Long> {
 
-    // Newest first, for the Announcements board and the dashboard strip.
-    List<Announcement> findAllByOrderByCreatedDateDesc();
+    // One house's notices, newest first, for that house's Announcements
+    // board and dashboard strip.
+    List<Announcement> findByHouseOrderByCreatedDateDesc(House house);
 }

@@ -54,6 +54,14 @@ public class Bill {
     @JoinColumn(name = "created_by_id", nullable = false)
     private User createdBy;
 
+    // Which house this bill belongs to - set from createdBy's house when
+    // the bill is created. Stored explicitly (rather than always looking
+    // it up via createdBy.getHouse()) so bills stay correctly scoped to
+    // their house even if the creator's own account is later deleted.
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "house_id", nullable = false)
+    private House house;
+
     // One BillPayment per housemate, tracking their share and paid status.
     // orphanRemoval + cascade ALL means deleting a Bill cleans up its
     // BillPayment rows automatically.
@@ -64,13 +72,14 @@ public class Bill {
     }
 
     public Bill(String description, String category, double totalAmount,
-                LocalDate dueDate, LocalDate createdDate, User createdBy) {
+                LocalDate dueDate, LocalDate createdDate, User createdBy, House house) {
         this.description = description;
         this.category = category;
         this.totalAmount = totalAmount;
         this.dueDate = dueDate;
         this.createdDate = createdDate;
         this.createdBy = createdBy;
+        this.house = house;
     }
 
     public Long getId() {
@@ -127,6 +136,14 @@ public class Bill {
 
     public void setCreatedBy(User createdBy) {
         this.createdBy = createdBy;
+    }
+
+    public House getHouse() {
+        return house;
+    }
+
+    public void setHouse(House house) {
+        this.house = house;
     }
 
     public List<BillPayment> getPayments() {
