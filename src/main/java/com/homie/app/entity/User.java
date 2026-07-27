@@ -1,6 +1,8 @@
 package com.homie.app.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -93,6 +95,7 @@ public class User {
     // database actually in use (e.g. bytea on PostgreSQL) instead of
     // hardcoding a MySQL-only type name.
     @Lob
+    @JdbcTypeCode(SqlTypes.VARBINARY)
     private byte[] profilePicture;
 
     // The picture's MIME type (e.g. "image/png" or "image/jpeg"), so we
