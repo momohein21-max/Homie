@@ -94,7 +94,7 @@ public class User {
     // is specified so Hibernate picks whichever binary type matches the
     // database actually in use (e.g. bytea on PostgreSQL) instead of
     // hardcoding a MySQL-only type name.
-    @Lob
+
     @JdbcTypeCode(SqlTypes.VARBINARY)
     private byte[] profilePicture;
 
