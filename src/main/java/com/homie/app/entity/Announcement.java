@@ -1,7 +1,8 @@
 package com.homie.app.entity;
 
 import jakarta.persistence.*;
-
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
@@ -35,7 +36,7 @@ public class Announcement {
 
     // The full notice text. Can contain multiple paragraphs, separated by a
     // blank line — see getParagraphs().
-    @Lob
+    @JdbcTypeCode(SqlTypes.LONGVARCHAR)
     @Column(nullable = false)
     private String body;
 
