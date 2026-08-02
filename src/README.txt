@@ -1,148 +1,101 @@
-HOMIE - FORGOT PASSWORD (+ two Postgres bugs caught along the way)
+HOMIE - NOTIFICATION BUG FIX + BILL DELETION FIX + DEMO BUTTON
 =======================================================================
 
-15 files. Covers three things:
-  1. A full self-service "forgot password" flow (what you asked for)
-  2. A silent login bug the MySQL -> Postgres migration introduced
-  3. A profile-picture bug the same migration introduced
+8 files. Covers three things, most important first:
 
-Both bugs (2 and 3) hadn't caused any visible error yet, but would have
-eventually - I found them while reading through the code to build the
-password reset feature, so I've fixed them now rather than waiting for
-them to show up as confusing mystery bugs later.
+  1. REAL BUG FIX: notifications were silently failing to insert at all
+     (see below) - this is the actual reason nothing ever showed up on
+     the bell or arrived by email tonight
+  2. A house-scoping fix to BillService.deleteAllForUser (minor,
+     found while reviewing the account-deletion flow)
+  3. A demo-only "Send bill reminders now" button on the Bills page
 
 
-WHERE EVERYTHING GOES
--------------------------
-pom.xml                                          -> project root
-application.properties                           -> src/main/resources/
-main/java/.../entity/User.java                   -> entity package
-main/java/.../repository/UserRepository.java     -> repository package
-main/java/.../service/CustomUserDetailsService.java -> service package
-main/java/.../service/UserService.java           -> service package
-main/java/.../service/EmailService.java          -> service package (NEW)
-main/java/.../controller/DashboardController.java   -> controller package
-main/java/.../controller/PasswordResetController.java -> controller package (NEW)
-main/java/.../config/SecurityConfig.java         -> config package
-main/java/.../dto/ForgotPasswordDto.java         -> dto package (NEW)
-main/java/.../dto/ResetPasswordDto.java          -> dto package (NEW)
-main/resources/templates/login.html              -> templates
-main/resources/templates/forgot-password.html    -> templates (NEW)
-main/resources/templates/reset-password.html     -> templates (NEW)
+WHERE EVERYTHING GOES (all REPLACE existing files except DemoController)
+--------------------------------------------------------------------------
+Notification.java        -> main/java/.../entity/          (REPLACES existing)
+DemoController.java      -> main/java/.../controller/      (NEW FILE)
+BillRepository.java      -> main/java/.../repository/      (REPLACES existing)
+BillService.java         -> main/java/.../service/          (REPLACES existing)
+BillReminderScheduler.java -> main/java/.../service/        (REPLACES existing)
+BillPaymentRepository.java -> main/java/.../repository/     (REPLACES existing)
+ProfileController.java   -> main/java/.../controller/      (REPLACES existing)
+BillServiceTest.java     -> test/java/.../service/          (REPLACES existing)
+bills.html               -> main/resources/templates/       (REPLACES existing)
 
 Drag everything in, overwriting the files that already exist.
 
 
 ======================================================================
-PART 1: THE TWO BUGS I FOUND (fix these even if you don't want email yet)
+PART 1: THE REAL BUG - notifications were never actually saving
 ======================================================================
 
-BUG A - Login could silently fail after the Postgres migration
+WHAT WAS WRONG
 --------------------------------------------------------------------
-MySQL compares text case-INsensitively by default, so
-"momo@Gmail.com" and "momo@gmail.com" were always treated as the same
-email. PostgreSQL compares text case-SENSITIVELY by default. That means
-after moving to Postgres, if you ever typed your email with different
-capitalisation than how it's stored, login would fail with "wrong email
-or password" even though the password was right.
+The Notification entity's createdDate field had no explicit @Column
+mapping, so Hibernate used its default naming convention and tried to
+insert into a column called created_date. Your actual Supabase table
+has that column named created_at instead (NOT NULL, no default).
 
-Fixed by changing every email lookup (login, registration, checking for
-duplicate emails) to explicitly ignore case. This touches
-UserRepository.java, CustomUserDetailsService.java, UserService.java,
-and DashboardController.java - all included here.
+Every single attempt to save a notification - whether from a bill
+reminder, or any other feature that might use NotificationService in
+future - was hitting a database error:
 
-BUG B - Profile pictures would eventually break
+  ERROR: null value in column "created_at" of relation "notifications"
+  violates not-null constraint
+
+This explains everything from tonight: the bell never lighting up,
+no emails going out even when the bill-matching logic was 100% correct
+(it was - we confirmed the query found the right bills and the right
+housemates every time). The insert into notifications was silently
+failing underneath it, which meant the code never even reached the
+email-sending line.
+
+THE FIX
 --------------------------------------------------------------------
-User.java told the database to store profile pictures using a type
-called "LONGBLOB" - that's a MySQL-only type name. PostgreSQL has never
-heard of it. This hadn't caused a visible crash yet because Hibernate's
-auto-schema-update seems to have let table creation slide through, but
-it was a ticking time bomb: the moment someone tried to actually upload
-a NEW profile picture against a freshly Postgres-backed column, it very
-likely would have failed.
+Notification.java now has:
+  @Column(name = "created_at", nullable = false)
+  private LocalDateTime createdDate;
 
-Fixed by removing that MySQL-specific instruction entirely and letting
-Hibernate pick whichever binary storage type is correct for whichever
-database you're actually using - PostgreSQL in this case.
+This tells Hibernate to write to the real column name (created_at)
+while keeping the Java field name (createdDate) exactly as it was -
+so nothing else in the codebase needs to change. The repository's
+findTop20ByUserOrderByCreatedDateDesc query still works unchanged,
+since Spring Data derives that from the field name, not the column.
+
+WORTH MENTIONING IN YOUR REPORT
+--------------------------------------------------------------------
+This is a genuinely good thing to write up honestly: it's a real bug
+you found and fixed through methodical debugging (adding temporary
+diagnostic logging, checking raw database values against what the UI
+displayed, ruling out several other theories first). That process -
+and the fact that the underlying reminder/query logic was correct the
+whole time - is worth a sentence or two in your testing/evaluation
+section.
 
 
 ======================================================================
-PART 2: FORGOT PASSWORD - WHAT YOU ASKED FOR
+PART 2: THE BILL-DELETION SCOPING FIX (minor, found earlier tonight)
 ======================================================================
 
-How it works
-----------------
-1. Housemate clicks "Forgot password?" on the login page
-2. Types their email, clicks "Send reset link"
-3. They ALWAYS see the same "check your email" message, whether or not
-   that email actually belongs to an account - this is deliberate: it
-   stops someone from using this form to figure out which email
-   addresses are registered
-4. If the email did match an account, a real email goes out with a
-   one-time link, valid for 30 minutes
-5. Clicking it lets them choose a new password
-6. The link stops working immediately after use (or after 30 minutes,
-   whichever comes first)
-
-New database columns: reset_token and reset_token_expiry on the users
-table, created automatically like everything else has been.
+BillService.deleteAllForUser used to call billRepository.findAll() -
+every bill in the entire app, not just the departing housemate's own
+house. Not a visible bug at your current scale (one house), but
+inconsistent with how every other bill query in the app is scoped.
+Fixed to take a House parameter and use a new findByHouse(House) query
+instead. ProfileController and BillServiceTest updated to match.
 
 
-ONE THING YOU MUST DO BEFORE THIS WORKS: set up a Gmail App Password
---------------------------------------------------------------------------
-Sending real emails needs real email-sending credentials. Since you
-already have momohein21@gmail.com, we're using Gmail's own mail server
-rather than signing up for a separate service.
+======================================================================
+PART 3: DEMO BUTTON - "SEND BILL REMINDERS NOW"
+======================================================================
 
-Gmail won't accept your normal Gmail password for this - it needs a
-special 16-character "App Password" instead. Steps:
+Still included and still useful, now that the real bug is fixed -
+this lets you demo the reminder system on demand instead of waiting
+for the 8am scheduled job. Go to Bills page -> "Add a bill" with a
+due date of today/yesterday/tomorrow -> open "Demo: send bill
+reminders now" -> click "Send reminders now". Check the bell and your
+email - both should now actually work.
 
-  1. Go to myaccount.google.com/security
-  2. Turn ON "2-Step Verification" if it isn't already on (Gmail
-     requires this before it'll let you create an App Password)
-  3. Once that's on, go to myaccount.google.com/apppasswords
-  4. It'll ask you to name the app password - type "Homie"
-  5. Click Create. Gmail shows you a 16-character code like:
-       abcd efgh ijkl mnop
-     (spacing doesn't matter - you can include or remove the spaces)
-  6. Open application.properties and find this line:
-       spring.mail.password=${MAIL_APP_PASSWORD:MAIL_APP_PASSWORD}
-     Replace the SECOND "MAIL_APP_PASSWORD" (after the colon) with the
-     16-character code Gmail gave you, e.g.:
-       spring.mail.password=${MAIL_APP_PASSWORD:abcdefghijklmnop}
-
-That's the only manual step. Everything else (SMTP host, port, etc.) is
-already filled in for Gmail.
-
-
-ONE THING TO UPDATE ONCE YOUR SITE IS LIVE ON RENDER
----------------------------------------------------------
-application.properties has this line:
-    app.base-url=${APP_BASE_URL:http://localhost:8080}
-
-This is what reset links are built from. Right now it points at your
-local machine, which is fine for testing locally. Once your Web Service
-is live on Render with a real https://....onrender.com address, change
-the fallback value to that address, e.g.:
-    app.base-url=${APP_BASE_URL:https://homie-xxxx.onrender.com}
-Otherwise, reset emails sent from the LIVE site would contain links
-pointing at "localhost", which only works on your own machine.
-
-
-TRYING IT OUT
------------------
-1. Set your Gmail App Password (above), drag all 15 files in, restart
-2. Go to the login page, click "Forgot password?"
-3. Type an email that's actually registered in your database, submit
-4. You should see "Check your email"
-5. Check that inbox - you should get a real email within a few seconds,
-   with a subject like "Reset your Homie password"
-6. Click the link in the email
-7. Type a new password twice, submit
-8. You should land back on the login page with "Your password has been
-   changed. Please log in." - log in with the new password to confirm
-
-If no email arrives within a minute or two, the most common cause is
-the App Password not being set correctly - double check step 6 above,
-and check IntelliJ's Run console for any error mentioning
-"authentication failed" or "535", which both point at the same thing.
+Worth mentioning in your report/demo that this is a demo aid calling
+the same real method the scheduled job uses, not a separate system.

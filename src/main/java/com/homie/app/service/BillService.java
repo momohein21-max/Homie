@@ -191,28 +191,32 @@ public class BillService {
      * bill, plus every bill they created themselves (which cascades to
      * remove that bill's payment rows too).
      *
+     * Scoped to the departing housemate's own house — with any number of
+     * independent houses now sharing Homie, there is no reason for this to
+     * touch (or even load) another house's bills at all.
+     *
      * This must run before the User row itself is deleted — otherwise the
      * database rejects the deletion outright, since bills and bill
      * payments are required to point at a real housemate. Called from
      * ProfileController just before UserService.deleteAccount().
      */
     @Transactional
-    public void deleteAllForUser(Long userId) {
-        List<Bill> allBills = billRepository.findAll();
+    public void deleteAllForUser(Long userId, House house) {
+        List<Bill> houseBills = billRepository.findByHouse(house);
 
         // Remove their own share from every bill they didn't create themselves.
-        for (Bill bill : allBills) {
+        for (Bill bill : houseBills) {
             boolean isOwnBill = bill.getCreatedBy() != null && bill.getCreatedBy().getId().equals(userId);
             if (!isOwnBill) {
                 bill.getPayments().removeIf(payment ->
                         payment.getUser() != null && payment.getUser().getId().equals(userId));
             }
         }
-        billRepository.saveAll(allBills);
+        billRepository.saveAll(houseBills);
 
         // Delete every bill they created themselves — cascades to remove
         // that bill's payment rows too (Bill.payments has cascade=ALL).
-        List<Bill> ownBills = allBills.stream()
+        List<Bill> ownBills = houseBills.stream()
                 .filter(bill -> bill.getCreatedBy() != null && bill.getCreatedBy().getId().equals(userId))
                 .toList();
         billRepository.deleteAll(ownBills);

@@ -199,7 +199,7 @@ public class ProfileController {
 
         User user = userService.findByEmail(authentication.getName());
 
-        billService.deleteAllForUser(user.getId());
+        billService.deleteAllForUser(user.getId(), user.getHouse());
         announcementService.deleteAllForUser(user.getId());
         userService.deleteAccount(authentication.getName());
 

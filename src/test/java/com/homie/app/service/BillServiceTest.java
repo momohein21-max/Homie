@@ -249,9 +249,9 @@ class BillServiceTest {
         addPayment(ownBill, leaving, false);
         addPayment(ownBill, housemate, false);
 
-        when(billRepository.findAll()).thenReturn(List.of(othersBill, ownBill));
+        when(billRepository.findByHouse(house)).thenReturn(List.of(othersBill, ownBill));
 
-        billService.deleteAllForUser(7L);
+        billService.deleteAllForUser(7L, house);
 
         assertEquals(1, othersBill.getPayments().size());
         assertSame(housemate, othersBill.getPayments().get(0).getUser());

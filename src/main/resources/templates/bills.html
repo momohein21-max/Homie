@@ -134,6 +134,8 @@
 
         .alert-warning { background: var(--ochre-bg); color: var(--ochre); border-radius: 12px; padding: 12px 15px;
                           font-size: 14px; margin: 0 0 18px; }
+        .alert-success { background: var(--green-pale); color: var(--green-deep); border-radius: 12px; padding: 12px 15px;
+                          font-size: 14px; margin: 0 0 18px; }
 
         .translate-toggle { margin-top: 14px; }
         .translate-toggle > summary { font-size: 13px; font-weight: 600; color: var(--green-soft); cursor: pointer; list-style: none; }
@@ -235,6 +237,7 @@
         <div class="content">
 
             <div class="alert-warning" th:if="${billsError}" th:text="${billsError}"></div>
+            <div class="alert-success" th:if="${billsSuccess}" th:text="${billsSuccess}"></div>
 
             <div class="stat-grid">
                 <div class="card stat-card">
@@ -281,6 +284,21 @@
                             </div>
                             <button type="submit" class="btn-primary">Add bill</button>
                         </div>
+                    </form>
+                </div>
+            </details>
+
+            <details class="add-bill-toggle">
+                <summary>Demo: send bill reminders now</summary>
+                <div class="card" style="padding:16px 22px;margin-bottom:20px;">
+                    <p style="color:var(--muted);font-size:13px;margin:0 0 12px;">
+                        Reminders normally go out automatically once a day, only for bills due
+                        yesterday, today, or tomorrow. This button runs that same check right now,
+                        for demo purposes - it won't notify anyone about a bill that isn't
+                        genuinely due around today.
+                    </p>
+                    <form th:action="@{/demo/send-bill-reminders-now}" method="post">
+                        <button type="submit" class="btn-primary">Send reminders now</button>
                     </form>
                 </div>
             </details>

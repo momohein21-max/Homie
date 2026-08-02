@@ -16,4 +16,11 @@ public interface BillRepository extends JpaRepository<Bill, Long> {
     // house, since every house's bills are entirely separate from every
     // other house's.
     List<Bill> findByHouseOrderByDueDateAsc(House house);
+
+    // Every bill belonging to one house, in no particular order. Used when
+    // deleting a housemate's account (see BillService.deleteAllForUser) so
+    // that operation only touches bills in the departing housemate's own
+    // house, instead of loading and re-saving every house's bills in the
+    // whole app.
+    List<Bill> findByHouse(House house);
 }
